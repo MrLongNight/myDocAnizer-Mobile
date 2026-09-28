@@ -1,6 +1,6 @@
 {
-  "name": "Dokumenten Tresor",
-  "description": "myDocAnizer: Privacy-First Document Management & Scanner App with two-tier template hierarchy, virtual doc-groups, OCR, and client-side encryption.",
+  "name": "myDocAnizer-Mobile",
+  "description": "myDocAnizer-Mobile: Privacy-First Document Management & Scanner App with Dokumenten-Tresor, two-tier template hierarchy, custom fields, OCR, and client-side encryption.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

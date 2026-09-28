@@ -50,7 +50,7 @@ fun AppStartSplashAnimation(
     onAnimationFinished: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val totalDurationMs = 7000
+    val totalDurationMs = 1800
     val progressAnim = remember { Animatable(0f) }
     val infiniteTransition = rememberInfiniteTransition(label = "splash_infinite")
 
@@ -257,7 +257,7 @@ fun AppStartSplashAnimation(
                 .scale(pulseScale)
         ) {
             AppLogoBanner(
-                iconHeight = 60.dp,
+                iconHeight = 180.dp,
                 fontSize = 28f,
                 includeContainer = true,
                 showTagline = true,

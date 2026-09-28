@@ -88,12 +88,14 @@ fun MainScreen(
             topBar = {
                 if (currentTab != MainNavigationTab.SCANNER) {
                     TopAppBar(
+                        modifier = Modifier.height(84.dp),
                         title = {
                             AppLogoBanner(
-                                iconHeight = 36.dp,
+                                iconHeight = 76.dp,
                                 fontSize = 21f,
                                 includeContainer = false,
-                                showTagline = false
+                                showTagline = false,
+                                modifier = Modifier.fillMaxWidth().padding(end = 4.dp)
                             )
                         },
                         navigationIcon = {

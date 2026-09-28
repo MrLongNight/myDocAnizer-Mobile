@@ -23,7 +23,7 @@ import com.example.R
 @Composable
 fun MyDocAnizerDesktopLogo(
     modifier: Modifier = Modifier,
-    height: Dp = 56.dp,
+    height: Dp = 130.dp,
     showSubtitle: Boolean = true
 ) {
     Surface(
@@ -36,7 +36,7 @@ fun MyDocAnizerDesktopLogo(
     ) {
         Box(
             modifier = Modifier
-                .wrapContentWidth()
+                .fillMaxWidth()
                 .padding(horizontal = 14.dp, vertical = 6.dp),
             contentAlignment = Alignment.Center
         ) {
@@ -46,7 +46,7 @@ fun MyDocAnizerDesktopLogo(
                 contentScale = ContentScale.Fit,
                 modifier = Modifier
                     .height(height)
-                    .wrapContentWidth()
+                    .fillMaxWidth()
                     .testTag("desktop_logo_image")
             )
         }
@@ -59,7 +59,7 @@ fun MyDocAnizerDesktopLogo(
 @Composable
 fun MyDocAnizerLightLogo(
     modifier: Modifier = Modifier,
-    height: Dp = 56.dp,
+    height: Dp = 130.dp,
     showSubtitle: Boolean = true
 ) {
     MyDocAnizerDesktopLogo(modifier = modifier, height = height, showSubtitle = showSubtitle)

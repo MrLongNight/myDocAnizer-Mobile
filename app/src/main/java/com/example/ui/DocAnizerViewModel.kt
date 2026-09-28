@@ -28,11 +28,76 @@ class DocAnizerViewModel(application: Application) : AndroidViewModel(applicatio
 
     private val db = AppDatabase.getDatabase(application)
     val documentDao = db.documentDao()
+    val customFieldDao = db.customFieldDao()
     private val settingsRepo = SettingsRepository(application)
     val ruleRepo = DocRuleRepository(application)
     val llmService = LlmService(application)
     val biometricAuthManager = BiometricAuthManager(application)
     val p2pSyncManager = P2pSyncManager(application, db)
+
+    // Vordefinierte & Benutzerdefinierte Zusatzfelder (Custom Fields)
+    val customFields: StateFlow<List<com.example.model.CustomFieldEntity>> = customFieldDao.getAllCustomFields()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val allDocumentCustomFieldValues: StateFlow<List<com.example.model.DocumentCustomFieldValueEntity>> = customFieldDao.getAllDocumentCustomFieldValues()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val enableIncomeExpenseTracking: StateFlow<Boolean> = settingsRepo.enableIncomeExpenseTracking
+    val enableHouseholdBook: StateFlow<Boolean> = settingsRepo.enableHouseholdBook
+    fun setEnableIncomeExpenseTracking(enabled: Boolean) = settingsRepo.setEnableIncomeExpenseTracking(enabled)
+    fun setEnableHouseholdBook(enabled: Boolean) = settingsRepo.setEnableHouseholdBook(enabled)
+
+    val enableCashTracker: StateFlow<Boolean> = settingsRepo.enableCashTracker
+    fun setEnableCashTracker(enabled: Boolean) = settingsRepo.setEnableCashTracker(enabled)
+
+    val enableReceiptExpenses: StateFlow<Boolean> = settingsRepo.enableReceiptExpenses
+    fun setEnableReceiptExpenses(enabled: Boolean) = settingsRepo.setEnableReceiptExpenses(enabled)
+
+    val enableBankStatementImport: StateFlow<Boolean> = settingsRepo.enableBankStatementImport
+    fun setEnableBankStatementImport(enabled: Boolean) = settingsRepo.setEnableBankStatementImport(enabled)
+
+    val enableMonthlyReconciliation: StateFlow<Boolean> = settingsRepo.enableMonthlyReconciliation
+    fun setEnableMonthlyReconciliation(enabled: Boolean) = settingsRepo.setEnableMonthlyReconciliation(enabled)
+
+    val reconciliationToleranceDays: StateFlow<Int> = settingsRepo.reconciliationToleranceDays
+    fun setReconciliationToleranceDays(days: Int) = settingsRepo.setReconciliationToleranceDays(days)
+
+    val notifyReconciliationDiscrepancies: StateFlow<Boolean> = settingsRepo.notifyReconciliationDiscrepancies
+    fun setNotifyReconciliationDiscrepancies(enabled: Boolean) = settingsRepo.setNotifyReconciliationDiscrepancies(enabled)
+
+    fun addCustomField(field: com.example.model.CustomFieldEntity) {
+        viewModelScope.launch(Dispatchers.IO) {
+            customFieldDao.insertCustomField(field)
+        }
+    }
+
+    fun updateCustomField(field: com.example.model.CustomFieldEntity) {
+        viewModelScope.launch(Dispatchers.IO) {
+            customFieldDao.updateCustomField(field)
+        }
+    }
+
+    fun deleteCustomField(fieldId: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            customFieldDao.deleteCustomFieldById(fieldId)
+        }
+    }
+
+    fun setDocumentCustomFieldValue(documentId: Long, customFieldId: String, value: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            if (value.isBlank()) {
+                customFieldDao.deleteFieldValue(documentId, customFieldId)
+            } else {
+                customFieldDao.insertOrUpdateFieldValue(
+                    com.example.model.DocumentCustomFieldValueEntity(
+                        documentId = documentId,
+                        customFieldId = customFieldId,
+                        fieldValue = value
+                    )
+                )
+            }
+        }
+    }
 
     // Lokaler WLAN / P2P Master-Master Sync
     val p2pPairedDevices: StateFlow<List<com.example.model.PairedDevice>> = p2pSyncManager.pairedDevices
@@ -1033,6 +1098,60 @@ class DocAnizerViewModel(application: Application) : AndroidViewModel(applicatio
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     init {
+        // Preset Zusatzfelder (Custom Fields) initialisieren falls DB leer ist
+        viewModelScope.launch(Dispatchers.IO) {
+            val existingFields = customFieldDao.getAllCustomFieldsList()
+            if (existingFields.isEmpty()) {
+                val presets = listOf(
+                    com.example.model.CustomFieldEntity(
+                        id = "cf_monthly_amount",
+                        name = "Monatliche Kosten",
+                        description = "Regelmäßige Fixkosten / Abo-Betrag",
+                        type = com.example.model.CustomFieldType.AMOUNT,
+                        scope = com.example.model.CustomFieldScope.GLOBAL
+                    ),
+                    com.example.model.CustomFieldEntity(
+                        id = "cf_contract_partner",
+                        name = "Vertragspartner / Firma",
+                        description = "Absender oder Anbieter",
+                        type = com.example.model.CustomFieldType.TEXT,
+                        scope = com.example.model.CustomFieldScope.GLOBAL
+                    ),
+                    com.example.model.CustomFieldEntity(
+                        id = "cf_customer_number",
+                        name = "Kundennummer / Vertrags-ID",
+                        description = "Eindeutiges Aktenzeichen",
+                        type = com.example.model.CustomFieldType.TEXT,
+                        scope = com.example.model.CustomFieldScope.GLOBAL
+                    ),
+                    com.example.model.CustomFieldEntity(
+                        id = "cf_status",
+                        name = "Bearbeitungsstatus",
+                        description = "Status im Tresor",
+                        type = com.example.model.CustomFieldType.SELECTION,
+                        options = "Offen,Bezahlt,Gekündigt,Prüfen,In Bearbeitung",
+                        scope = com.example.model.CustomFieldScope.GLOBAL
+                    ),
+                    com.example.model.CustomFieldEntity(
+                        id = "cf_cancellation_notice",
+                        name = "Kündigungsfrist",
+                        description = "Datum der Kündigungsfrist",
+                        type = com.example.model.CustomFieldType.DATE,
+                        scope = com.example.model.CustomFieldScope.FOLDER_SPECIFIC,
+                        targetMainCategory = "Verträge"
+                    ),
+                    com.example.model.CustomFieldEntity(
+                        id = "cf_tax_relevant",
+                        name = "Steuerrelevant",
+                        description = "Für Steuererklärung vormerken",
+                        type = com.example.model.CustomFieldType.BOOLEAN,
+                        scope = com.example.model.CustomFieldScope.GLOBAL
+                    )
+                )
+                presets.forEach { customFieldDao.insertCustomField(it) }
+            }
+        }
+
         viewModelScope.launch {
             templates.collect { list ->
                 if (_selectedTemplate.value == null) {

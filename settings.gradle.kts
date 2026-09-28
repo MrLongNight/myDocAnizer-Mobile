@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "myDocAnizer"
+rootProject.name = "myDocAnizer-Mobile"
 
 include(":app")

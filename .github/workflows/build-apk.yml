@@ -1,4 +1,4 @@
-name: Build Debug APK
+name: Build APK
 
 on:
   push:
@@ -14,21 +14,19 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-debug:
-    name: Build & Package Debug APK
-    runs-on: ubuntu-24.04
+  build-apk:
+    name: Build & Package APK
+    runs-on: ubuntu-latest
     timeout-minutes: 30
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v4
         with:
           java-version: '21'
           distribution: 'temurin'
@@ -43,7 +41,6 @@ jobs:
           echo "=== Workspace contents ==="
           ls -la
 
-          # 1. Projekt-Verzeichnis lokalisieren (falls in Subdirectory exportiert)
           if [ -f "settings.gradle.kts" ]; then
             TARGET_DIR="."
           elif [ -f "applet/settings.gradle.kts" ]; then
@@ -62,21 +59,17 @@ jobs:
 
           cd "$TARGET_DIR"
 
-          # 2. Falls gradlew fehlt oder der Wrapper unvollstaendig ist, erzeuge ihn direkt
           if [ ! -f "gradlew" ] || [ ! -f "gradle/wrapper/gradle-wrapper.jar" ]; then
-            echo "gradlew oder gradle-wrapper.jar fehlt. Erzeuge Gradle Wrapper mit Gradle 9.3.1..."
+            echo "Erzeuge Gradle Wrapper..."
             gradle wrapper --gradle-version 9.3.1 --distribution-type bin
           fi
 
-          # 3. Ausfuehrungsrechte sicherstellen
           chmod +x gradlew
-          ls -la gradlew
 
       - name: Prepare Environment & Keystore
         run: |
           cd "${{ env.PROJECT_DIR }}"
 
-          # Fallback fuer Umgebungsvariablen (.env)
           if [ ! -f .env ]; then
             if [ -f .env.example ]; then
               cp .env.example .env
@@ -85,7 +78,6 @@ jobs:
             fi
           fi
 
-          # Debug Keystore vorbereiten falls noetig
           if [ ! -f debug.keystore ]; then
             if [ -f debug.keystore.base64 ]; then
               base64 -d debug.keystore.base64 > debug.keystore
@@ -101,22 +93,22 @@ jobs:
           cd "${{ env.PROJECT_DIR }}"
           ./gradlew assembleDebug --stacktrace --no-daemon
 
-      - name: Find and Verify Debug APK
+      - name: Find and Verify APK
         id: apk-check
         run: |
-          APK_PATH=$(find "${{ env.PROJECT_DIR }}" -name "*debug*.apk" -not -path "*/.*" | head -n 1)
+          APK_PATH=$(find "${{ env.PROJECT_DIR }}" -name "*.apk" -not -path "*/.*" | head -n 1)
           if [ -z "$APK_PATH" ]; then
-            echo "Fehler: Keine Debug APK generiert!"
+            echo "Fehler: Keine APK generiert!"
             exit 1
           fi
           echo "Gefundene APK: $APK_PATH"
           echo "apk_path=$APK_PATH" >> "$GITHUB_OUTPUT"
           ls -lh "$APK_PATH"
 
-      - name: Upload Debug APK Artifact
-        uses: actions/upload-artifact@v5
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
         with:
-          name: MyDocAnizer-Debug-APK
+          name: myDocAnizer-Mobile-APK
           path: ${{ steps.apk-check.outputs.apk_path }}
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 30

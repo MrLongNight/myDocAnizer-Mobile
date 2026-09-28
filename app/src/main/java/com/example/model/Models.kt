@@ -46,6 +46,61 @@ data class DocumentEntity(
     val amount: Double? = null                  // Rechnungsbetrag oder monatliche Kosten
 )
 
+enum class CustomFieldType(val label: String) {
+    TEXT("Freitext / Nummer"),
+    AMOUNT("Betrag (€)"),
+    DATE("Datum / Frist"),
+    SELECTION("Auswahl (Status)"),
+    BOOLEAN("Ja / Nein")
+}
+
+enum class CustomFieldScope(val label: String) {
+    GLOBAL("Global (Alle Ordner)"),
+    FOLDER_SPECIFIC("Ordner-Spezifisch")
+}
+
+@Entity(
+    tableName = "custom_fields",
+    indices = [
+        Index(value = ["scope"]),
+        Index(value = ["targetMainCategory"])
+    ]
+)
+data class CustomFieldEntity(
+    @PrimaryKey
+    val id: String = java.util.UUID.randomUUID().toString(),
+    val name: String,
+    val description: String = "",
+    val type: CustomFieldType = CustomFieldType.TEXT,
+    val options: String = "", // Kommagetrennt für SELECTION type (z. B. "Bezahlt,Offen,In Bearbeitung")
+    val scope: CustomFieldScope = CustomFieldScope.GLOBAL,
+    val targetMainCategory: String = "",
+    val targetSubCategory: String = "",
+    val defaultValue: String = "",
+    val isRequired: Boolean = false,
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+@Entity(
+    tableName = "document_custom_field_values",
+    primaryKeys = ["documentId", "customFieldId"],
+    indices = [
+        Index(value = ["documentId"]),
+        Index(value = ["customFieldId"])
+    ]
+)
+data class DocumentCustomFieldValueEntity(
+    val documentId: Long,
+    val customFieldId: String,
+    val fieldValue: String,
+    val updatedAt: Long = System.currentTimeMillis()
+)
+
+data class CustomFieldWithValue(
+    val field: CustomFieldEntity,
+    val value: String
+)
+
 data class ChatMessage(
     val id: String = java.util.UUID.randomUUID().toString(),
     val text: String,
@@ -955,7 +1010,8 @@ data class DocRule(
     val targetTags: List<String> = emptyList(),
     val isEnabled: Boolean = true,
     val confidenceScore: Float = 1.0f,
-    val isAiGenerated: Boolean = false // Ob die Regel von der lokalen KI vorgeschlagen wurde
+    val isAiGenerated: Boolean = false, // Ob die Regel von der lokalen KI vorgeschlagen wurde
+    val targetCustomFields: Map<String, String> = emptyMap() // Map von CustomField-ID zu Wert
 )
 
 /**

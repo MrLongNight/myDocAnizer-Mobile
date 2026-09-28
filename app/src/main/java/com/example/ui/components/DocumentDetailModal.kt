@@ -30,7 +30,10 @@ fun DocumentDetailModal(
     onUpdateDocType: (Long, String) -> Unit,
     onDelete: (DocumentEntity) -> Unit,
     onDismissRequest: () -> Unit,
-    onUpdateContractReminder: ((Long, Long?, Long?, Int, Boolean, String, String, Double?) -> Unit)? = null
+    onUpdateContractReminder: ((Long, Long?, Long?, Int, Boolean, String, String, Double?) -> Unit)? = null,
+    allCustomFields: List<com.example.model.CustomFieldEntity> = emptyList(),
+    documentCustomFieldValues: List<com.example.model.DocumentCustomFieldValueEntity> = emptyList(),
+    onUpdateCustomFieldValue: ((Long, String, String) -> Unit)? = null
 ) {
     val context = LocalContext.current
     var currentDocType by remember { mutableStateOf(document.docType) }
@@ -264,6 +267,127 @@ fun DocumentDetailModal(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                    }
+                }
+            }
+
+            // VORDEFINIERTE ZUSATZFELDER (CUSTOM FIELDS)
+            val applicableFields = remember(allCustomFields, document) {
+                allCustomFields.filter {
+                    it.scope == com.example.model.CustomFieldScope.GLOBAL ||
+                    it.targetMainCategory.isBlank() ||
+                    it.targetMainCategory.equals(document.mainCategory, ignoreCase = true)
+                }
+            }
+
+            if (applicableFields.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Card(
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Tune,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Text(
+                                text = "Zusatzfelder & Metadaten",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        applicableFields.forEach { field ->
+                            var fieldEditing by remember { mutableStateOf(false) }
+                            val existingVal = documentCustomFieldValues.find {
+                                it.documentId == document.id && it.customFieldId == field.id
+                            }?.fieldValue ?: field.defaultValue
+                            var tempVal by remember(existingVal) { mutableStateOf(existingVal) }
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = field.name,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Text(
+                                        text = if (existingVal.isNotBlank()) existingVal else "— Nicht gesetzt —",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = if (existingVal.isNotBlank()) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                    )
+                                }
+
+                                TextButton(onClick = { fieldEditing = true }) {
+                                    Text(if (existingVal.isNotBlank()) "Bearbeiten" else "Setzen")
+                                }
+                            }
+
+                            if (fieldEditing) {
+                                AlertDialog(
+                                    onDismissRequest = { fieldEditing = false },
+                                    title = { Text(field.name, fontWeight = FontWeight.Bold) },
+                                    text = {
+                                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            if (field.description.isNotBlank()) {
+                                                Text(field.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            }
+                                            if (field.type == com.example.model.CustomFieldType.SELECTION && field.options.isNotBlank()) {
+                                                val opts = field.options.split(",").map { it.trim() }
+                                                opts.forEach { opt ->
+                                                    FilterChip(
+                                                        selected = tempVal == opt,
+                                                        onClick = { tempVal = opt },
+                                                        label = { Text(opt) }
+                                                    )
+                                                }
+                                            } else if (field.type == com.example.model.CustomFieldType.BOOLEAN) {
+                                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                                    FilterChip(selected = tempVal == "Ja", onClick = { tempVal = "Ja" }, label = { Text("Ja") })
+                                                    FilterChip(selected = tempVal == "Nein", onClick = { tempVal = "Nein" }, label = { Text("Nein") })
+                                                }
+                                            } else {
+                                                OutlinedTextField(
+                                                    value = tempVal,
+                                                    onValueChange = { tempVal = it },
+                                                    label = { Text("Wert eingeben") },
+                                                    singleLine = true,
+                                                    modifier = Modifier.fillMaxWidth()
+                                                )
+                                            }
+                                        }
+                                    },
+                                    confirmButton = {
+                                        Button(onClick = {
+                                            onUpdateCustomFieldValue?.invoke(document.id, field.id, tempVal)
+                                            fieldEditing = false
+                                        }) {
+                                            Text("Speichern")
+                                        }
+                                    },
+                                    dismissButton = {
+                                        TextButton(onClick = { fieldEditing = false }) {
+                                            Text("Abbrechen")
+                                        }
+                                    }
+                                )
+                            }
+                        }
                     }
                 }
             }

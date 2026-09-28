@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -67,6 +68,7 @@ fun SetupWizardDialog(
     // Dynamische Schritte je nach gewählter Ansichts-Ebene:
     // 1: Willkommen & App-Vorstellung
     // 2: Ansichtswahl & Datenrettung
+    // 12: Ein-&Ausgaben Erfassung (Eigenständige Konfigurationsseite)
     // 3: Speicherort & Ordner
     // 4: Kamera & Scan-Auslöser
     // 5: Bildqualität & DPI
@@ -78,9 +80,9 @@ fun SetupWizardDialog(
     // 11: Zusammenfassung & Start
     val activeSteps = remember(appViewLevel) {
         when (appViewLevel) {
-            AppViewLevel.STANDARD -> listOf(1, 2, 3, 4, 5, 6, 8, 9, 11)
-            AppViewLevel.ADVANCED -> listOf(1, 2, 3, 4, 5, 6, 7, 8, 9, 11)
-            AppViewLevel.EXPERT -> listOf(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
+            AppViewLevel.STANDARD -> listOf(1, 2, 12, 3, 4, 5, 6, 8, 9, 11)
+            AppViewLevel.ADVANCED -> listOf(1, 2, 12, 3, 4, 5, 6, 7, 8, 9, 11)
+            AppViewLevel.EXPERT -> listOf(1, 2, 12, 3, 4, 5, 6, 7, 8, 9, 10, 11)
         }
     }
 
@@ -203,7 +205,7 @@ fun SetupWizardDialog(
                         )
                     } else {
                         AppLogoBanner(
-                            iconHeight = 24.dp,
+                            iconHeight = 58.dp,
                             fontSize = 16f,
                             includeContainer = false,
                             showTagline = false
@@ -247,6 +249,7 @@ fun SetupWizardDialog(
                     when (stepId) {
                         1 -> StepWelcome(viewModel, isManualReconfig)
                         2 -> StepViewModeAndRestore(viewModel, isManualReconfig, onStartRestore = { isRestoreMode = true })
+                        12 -> StepIncomeExpenseConfig(viewModel)
                         3 -> StepStorageLocation(viewModel, pdfSettings)
                         4 -> StepScanCaptureAndTrigger(viewModel, scannerSettings)
                         5 -> StepQualityAndAutoColor(viewModel, pdfSettings)
@@ -393,7 +396,7 @@ private fun StepWelcome(
                 modifier = Modifier.padding(vertical = 12.dp, horizontal = 14.dp)
             ) {
                 AppLogoBanner(
-                    iconHeight = 48.dp,
+                    iconHeight = 150.dp,
                     fontSize = 24f,
                     includeContainer = false,
                     showTagline = true,
@@ -691,13 +694,6 @@ private fun StepViewModeAndRestore(
             }
         }
 
-        Text(
-            text = "Wähle deine bevorzugte Ansicht:",
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary
-        )
-
         // 1. STANDARD ANSICHT CARD
         Surface(
             shape = RoundedCornerShape(12.dp),
@@ -852,6 +848,395 @@ private fun StepViewModeAndRestore(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+        }
+    }
+}
+
+/**
+ * Schritt 12: Ein-&Ausgaben Erfassung (Eigenständige Seite im Einrichtungs-Assistenten)
+ * Ermöglicht modulare Konfiguration:
+ * - Bargeld Tracker (Geldbörse & Barkasse)
+ * - Ein-/Ausgaben & Beleg Erfassung (Kassenbons, Rechnungen, OCR)
+ * - Kontoauszüge importieren (PDF/CSV)
+ * - Automatischer monatlicher Datenabgleich (Reconciliation für Steuerberater & Beleglücken)
+ */
+@Composable
+private fun StepIncomeExpenseConfig(
+    viewModel: DocAnizerViewModel
+) {
+    val enableTracking by viewModel.enableIncomeExpenseTracking.collectAsState()
+    val enableCashTracker by viewModel.enableCashTracker.collectAsState()
+    val enableReceiptExpenses by viewModel.enableReceiptExpenses.collectAsState()
+    val enableBankStatementImport by viewModel.enableBankStatementImport.collectAsState()
+    val enableMonthlyReconciliation by viewModel.enableMonthlyReconciliation.collectAsState()
+    val toleranceDays by viewModel.reconciliationToleranceDays.collectAsState()
+    val notifyDiscrepancies by viewModel.notifyReconciliationDiscrepancies.collectAsState()
+
+    val allThreeActive = enableCashTracker && enableReceiptExpenses && enableBankStatementImport
+
+    Column(
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("step_income_expense_config")
+    ) {
+        Column {
+            Text(
+                text = "Ein-&Ausgaben Erfassung",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Text(
+                text = "Definiere den genauen Umfang für deine Finanzen, Belege und den monatlichen Kassenabgleich.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        // 1. HAUPTSCHALTER CARD
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = if (enableTracking) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+            border = BorderStroke(
+                width = if (enableTracking) 1.5.dp else 1.dp,
+                color = if (enableTracking) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
+            ),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier.padding(14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Surface(
+                    shape = CircleShape,
+                    color = if (enableTracking) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                    modifier = Modifier.size(42.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.AccountBalanceWallet,
+                            contentDescription = null,
+                            tint = if (enableTracking) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        text = "Ein-&Ausgaben Erfassung aktivieren",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = if (enableTracking) "Modulare Finanz- & Belegerfassung ist aktiv." else "Standardmäßig deaktiviert. Aktiviere diese Option, um Finanzen und Belege zu verwalten.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = enableTracking,
+                    onCheckedChange = { isChecked ->
+                        viewModel.setEnableIncomeExpenseTracking(isChecked)
+                        if (isChecked && !enableCashTracker && !enableReceiptExpenses && !enableBankStatementImport) {
+                            viewModel.setEnableCashTracker(true)
+                            viewModel.setEnableReceiptExpenses(true)
+                            viewModel.setEnableBankStatementImport(true)
+                        }
+                    },
+                    modifier = Modifier.testTag("switch_enable_income_expense_tracking")
+                )
+            }
+        }
+
+        // UNTERTEILUNG DER FUNKTIONEN (NUR WENN HAUPTSCHALTER AKTIV)
+        AnimatedVisibility(
+            visible = enableTracking,
+            enter = expandVertically() + fadeIn(),
+            exit = shrinkVertically() + fadeOut()
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = "FUNKTIONSUMFANG GENAU DEFINIEREN",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+
+                // OPTION 1: Bargeld Tracker
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = if (enableCashTracker) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
+                    border = BorderStroke(
+                        width = 1.dp,
+                        color = if (enableCashTracker) MaterialTheme.colorScheme.secondary.copy(alpha = 0.6f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Payments,
+                            contentDescription = null,
+                            tint = if (enableCashTracker) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(
+                                text = "Bargeld Tracker (Geldbörse & Barkasse)",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = "Manuelle Erfassung von Bar-Ausgaben, Wechselgeld und Geldbörsenbestand zur Vermeidung ungeklärter Ausgaben.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = enableCashTracker,
+                            onCheckedChange = { viewModel.setEnableCashTracker(it) },
+                            modifier = Modifier.testTag("switch_cash_tracker")
+                        )
+                    }
+                }
+
+                // OPTION 2: Ein-/Ausgaben & Beleg Erfassung
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = if (enableReceiptExpenses) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
+                    border = BorderStroke(
+                        width = 1.dp,
+                        color = if (enableReceiptExpenses) MaterialTheme.colorScheme.secondary.copy(alpha = 0.6f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ReceiptLong,
+                            contentDescription = null,
+                            tint = if (enableReceiptExpenses) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(
+                                text = "Ein-/Ausgaben & Beleg Erfassung",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = "Laufende Einnahmen und Ausgaben mit Kassenbons, Rechnungen und automatischer OCR-Betragserkennung digital erfassen.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = enableReceiptExpenses,
+                            onCheckedChange = { viewModel.setEnableReceiptExpenses(it) },
+                            modifier = Modifier.testTag("switch_receipt_expenses")
+                        )
+                    }
+                }
+
+                // OPTION 3: Kontoauszüge importieren
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = if (enableBankStatementImport) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
+                    border = BorderStroke(
+                        width = 1.dp,
+                        color = if (enableBankStatementImport) MaterialTheme.colorScheme.secondary.copy(alpha = 0.6f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.AccountBalance,
+                            contentDescription = null,
+                            tint = if (enableBankStatementImport) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Text(
+                                text = "Kontoauszüge importieren",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = "Import und Analyse von PDF- oder CSV-Kontoauszügen von Girokonten und Kreditkarten.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = enableBankStatementImport,
+                            onCheckedChange = { viewModel.setEnableBankStatementImport(it) },
+                            modifier = Modifier.testTag("switch_bank_statement_import")
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                // SPEZIAL-FUNKTION: AUTOMATISCHER MONATLICHER DATENABGLEICH (RECONCILIATION)
+                if (allThreeActive) {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = if (enableMonthlyReconciliation) MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.35f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                        border = BorderStroke(
+                            width = if (enableMonthlyReconciliation) 1.5.dp else 1.dp,
+                            color = if (enableMonthlyReconciliation) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.outlineVariant
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.SyncAlt,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.tertiary,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                    Column {
+                                        Text(
+                                            text = "Automatischer monatlicher Datenabgleich",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Surface(
+                                            shape = RoundedCornerShape(4.dp),
+                                            color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.15f)
+                                        ) {
+                                            Text(
+                                                text = "FÜR STEUERBERATER & BELEG-LÜCKENPRÜFUNG",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.tertiary,
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                                Switch(
+                                    checked = enableMonthlyReconciliation,
+                                    onCheckedChange = { viewModel.setEnableMonthlyReconciliation(it) },
+                                    modifier = Modifier.testTag("switch_monthly_reconciliation")
+                                )
+                            }
+
+                            Text(
+                                text = "Gleicht deine Bargeld-Abhebungen vom Kontoauszug (z. B. Geldautomat 200 €) automatisch mit den manuell erfassten Bar-Belegen ab. So werden eventuelle Lücken und vergessene Quittungen sofort sichtbar, damit Steuererklärung und Buchhaltung zu 100% lückenlos und nachvollziehbar belegt sind.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+
+                            if (enableMonthlyReconciliation) {
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "Lücken- & Differenzhinweise",
+                                            style = MaterialTheme.typography.labelLarge,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                        Text(
+                                            text = "Am Monatsende warnen, falls Barabhebungen und Belege abweichen.",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    Switch(
+                                        checked = notifyDiscrepancies,
+                                        onCheckedChange = { viewModel.setNotifyReconciliationDiscrepancies(it) }
+                                    )
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "Toleranzfenster für Zuordnung",
+                                            style = MaterialTheme.typography.labelLarge,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                        Text(
+                                            text = "Max. $toleranceDays Tage Differenz zwischen Abhebung und Belegdatum",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        listOf(3, 5, 7).forEach { days ->
+                                            FilterChip(
+                                                selected = toleranceDays == days,
+                                                onClick = { viewModel.setReconciliationToleranceDays(days) },
+                                                label = { Text("${days}T") }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    // Infokarte wenn nicht alle drei Optionen aktiv sind
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Text(
+                                text = "💡 Automatischer monatlicher Datenabgleich wird verfügbar, sobald Bargeld Tracker, Ein-/Ausgaben und Kontoauszüge gleichzeitig aktiviert sind. Damit können Bargeld-Abhebungen vom Konto automatisch mit deinen Bar-Belegen abgeglichen werden, um Erfassungslücken für die Steuererklärung aufzudecken.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
             }
         }
     }
@@ -4057,7 +4442,42 @@ private fun StepReadySummary(
             }
         }
 
-        // 6. Schnellstart-Tipps
+        // 6. Ein-&Ausgaben Erfassung
+        val enableTracking by viewModel.enableIncomeExpenseTracking.collectAsState()
+        val enableCashTracker by viewModel.enableCashTracker.collectAsState()
+        val enableReceiptExpenses by viewModel.enableReceiptExpenses.collectAsState()
+        val enableBankStatementImport by viewModel.enableBankStatementImport.collectAsState()
+        val enableMonthlyReconciliation by viewModel.enableMonthlyReconciliation.collectAsState()
+
+        Surface(
+            shape = RoundedCornerShape(8.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                    Text("💰 Ein-&Ausgaben Erfassung", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                }
+                if (enableTracking) {
+                    val modules = buildList {
+                        if (enableCashTracker) add("Bargeld Tracker")
+                        if (enableReceiptExpenses) add("Belege & OCR")
+                        if (enableBankStatementImport) add("Kontoauszüge")
+                    }
+                    Text("• Status: Aktiv (${modules.joinToString(", ").ifEmpty { "Keine Module aktiv" }})", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (enableMonthlyReconciliation) {
+                        Text("• Automatischer Monatsabgleich: Aktiviert (Lückenprüfung für Steuerberater)", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                    } else {
+                        Text("• Automatischer Monatsabgleich: Deaktiviert", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                } else {
+                    Text("• Status: Deaktiviert (kann jederzeit in den Einstellungen aktiviert werden)", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+
+        // 7. Schnellstart-Tipps
         Surface(
             shape = RoundedCornerShape(8.dp),
             color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.25f),

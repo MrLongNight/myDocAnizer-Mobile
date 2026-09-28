@@ -19,7 +19,7 @@ import com.example.R
 @Composable
 fun AppLogoBanner(
     modifier: Modifier = Modifier,
-    iconHeight: Dp = 48.dp,
+    iconHeight: Dp = 110.dp,
     fontSize: Float = 22f,
     includeContainer: Boolean = false,
     showTagline: Boolean = false,
@@ -36,7 +36,7 @@ fun AppLogoBanner(
             contentScale = ContentScale.Fit,
             modifier = Modifier
                 .height(iconHeight)
-                .wrapContentWidth()
+                .fillMaxWidth()
                 .testTag("app_logo_image")
         )
     }

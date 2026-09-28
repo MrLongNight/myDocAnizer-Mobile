@@ -74,10 +74,11 @@ fun AppLockScreen(
             ) {
                 // Offizielles myDocAnizer Logo-Banner
                 AppLogoBanner(
-                    iconHeight = 52.dp,
+                    iconHeight = 150.dp,
                     fontSize = 28f,
                     includeContainer = true,
-                    showTagline = true
+                    showTagline = true,
+                    modifier = Modifier.fillMaxWidth()
                 )
 
                 Column(

@@ -265,7 +265,7 @@ private fun Step1SelectConnectionType(
         // Offizielles myDocAnizer-Light Logo Banner
         com.example.ui.components.MyDocAnizerLightLogo(
             modifier = Modifier.fillMaxWidth(),
-            height = 58.dp,
+            height = 140.dp,
             showSubtitle = true
         )
 
@@ -540,7 +540,7 @@ private fun Step2ConfigureConnection(
                     Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         com.example.ui.components.MyDocAnizerDesktopLogo(
                             modifier = Modifier.fillMaxWidth(),
-                            height = 54.dp,
+                            height = 140.dp,
                             showSubtitle = true
                         )
 

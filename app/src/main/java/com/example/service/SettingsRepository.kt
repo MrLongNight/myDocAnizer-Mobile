@@ -20,6 +20,77 @@ class SettingsRepository(context: Context) {
 
     private val prefs: SharedPreferences = context.getSharedPreferences("mydocanizer_prefs", Context.MODE_PRIVATE)
 
+    // Ein-&Ausgaben Erfassung (ehemals Haushaltsbuch)
+    private val _enableIncomeExpenseTracking = MutableStateFlow(
+        prefs.getBoolean("enable_income_expense_tracking", prefs.getBoolean("enable_household_book", false))
+    )
+    val enableIncomeExpenseTracking: StateFlow<Boolean> = _enableIncomeExpenseTracking.asStateFlow()
+    val enableHouseholdBook: StateFlow<Boolean> = _enableIncomeExpenseTracking.asStateFlow()
+
+    fun setEnableIncomeExpenseTracking(enabled: Boolean) {
+        prefs.edit()
+            .putBoolean("enable_income_expense_tracking", enabled)
+            .putBoolean("enable_household_book", enabled)
+            .apply()
+        _enableIncomeExpenseTracking.value = enabled
+    }
+
+    fun setEnableHouseholdBook(enabled: Boolean) = setEnableIncomeExpenseTracking(enabled)
+
+    // Modul 1: Bargeld Tracker (Geldbörse & Barkasse)
+    private val _enableCashTracker = MutableStateFlow(prefs.getBoolean("enable_cash_tracker", false))
+    val enableCashTracker: StateFlow<Boolean> = _enableCashTracker.asStateFlow()
+
+    fun setEnableCashTracker(enabled: Boolean) {
+        prefs.edit().putBoolean("enable_cash_tracker", enabled).apply()
+        _enableCashTracker.value = enabled
+    }
+
+    // Modul 2: Ein-/Ausgaben & Beleg Erfassung (Kassenbons, Rechnungen, OCR)
+    private val _enableReceiptExpenses = MutableStateFlow(prefs.getBoolean("enable_receipt_expenses", false))
+    val enableReceiptExpenses: StateFlow<Boolean> = _enableReceiptExpenses.asStateFlow()
+
+    fun setEnableReceiptExpenses(enabled: Boolean) {
+        prefs.edit().putBoolean("enable_receipt_expenses", enabled).apply()
+        _enableReceiptExpenses.value = enabled
+    }
+
+    // Modul 3: Kontoauszüge importieren (PDF/CSV-Bankumsätze)
+    private val _enableBankStatementImport = MutableStateFlow(prefs.getBoolean("enable_bank_statement_import", false))
+    val enableBankStatementImport: StateFlow<Boolean> = _enableBankStatementImport.asStateFlow()
+
+    fun setEnableBankStatementImport(enabled: Boolean) {
+        prefs.edit().putBoolean("enable_bank_statement_import", enabled).apply()
+        _enableBankStatementImport.value = enabled
+    }
+
+    // Automatischer monatlicher Datenabgleich (Reconciliation / Kassenprüfung)
+    // Gleicht Bargeld-Abhebungen vom Konto mit manuellen Bar-Ausgaben ab (für Steuerberater & lückenlose Belege)
+    private val _enableMonthlyReconciliation = MutableStateFlow(prefs.getBoolean("enable_monthly_reconciliation", false))
+    val enableMonthlyReconciliation: StateFlow<Boolean> = _enableMonthlyReconciliation.asStateFlow()
+
+    fun setEnableMonthlyReconciliation(enabled: Boolean) {
+        prefs.edit().putBoolean("enable_monthly_reconciliation", enabled).apply()
+        _enableMonthlyReconciliation.value = enabled
+    }
+
+    // Zusätzliche Optionen für den Monatsabgleich
+    private val _reconciliationToleranceDays = MutableStateFlow(prefs.getInt("reconciliation_tolerance_days", 5))
+    val reconciliationToleranceDays: StateFlow<Int> = _reconciliationToleranceDays.asStateFlow()
+
+    fun setReconciliationToleranceDays(days: Int) {
+        prefs.edit().putInt("reconciliation_tolerance_days", days).apply()
+        _reconciliationToleranceDays.value = days
+    }
+
+    private val _notifyReconciliationDiscrepancies = MutableStateFlow(prefs.getBoolean("notify_reconciliation_discrepancies", true))
+    val notifyReconciliationDiscrepancies: StateFlow<Boolean> = _notifyReconciliationDiscrepancies.asStateFlow()
+
+    fun setNotifyReconciliationDiscrepancies(enabled: Boolean) {
+        prefs.edit().putBoolean("notify_reconciliation_discrepancies", enabled).apply()
+        _notifyReconciliationDiscrepancies.value = enabled
+    }
+
     // Dark / Light Theme Einstellung: "SYSTEM", "DARK", "LIGHT"
     private val _themeMode = MutableStateFlow(prefs.getString("app_theme_mode", "DARK") ?: "DARK")
     val themeMode: StateFlow<String> = _themeMode.asStateFlow()

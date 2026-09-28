@@ -2,6 +2,7 @@ package com.example.ui.views
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -75,13 +76,18 @@ fun DmsExplorerView(
     val activeFilterCount by viewModel.activeFilterCount.collectAsState()
     val docTypes by viewModel.docTypes.collectAsState()
 
-    // Papierkorb, Fristen & Kalender, KI-Chat
+    // Papierkorb, Fristen & Kalender, KI-Chat & Zusatzfelder
     val trashDocs by viewModel.trashDocuments.collectAsState()
     val trashCount by viewModel.trashCount.collectAsState()
     val contractDeadlines by viewModel.contractDeadlines.collectAsState()
     val trashRetentionDays by viewModel.trashRetentionDays.collectAsState()
     val calendarIntegrationMode by viewModel.calendarIntegrationMode.collectAsState()
     val chatMessages by viewModel.chatMessages.collectAsState()
+
+    val customFields by viewModel.customFields.collectAsState()
+    val allCustomFieldValues by viewModel.allDocumentCustomFieldValues.collectAsState()
+    var showCreateCustomFieldDialog by remember { mutableStateOf(false) }
+    var fieldToEdit by remember { mutableStateOf<com.example.model.CustomFieldEntity?>(null) }
 
     var activeSubTab by remember { mutableStateOf(0) } // 0: Ordner, 1: Gruppen, 2: Fristen & Kalender, 3: Papierkorb
     var selectedDocumentForDetail by remember { mutableStateOf<DocumentEntity?>(null) }
@@ -388,8 +394,8 @@ fun DmsExplorerView(
                     Tab(
                         selected = activeSubTab == 1,
                         onClick = { activeSubTab = 1 },
-                        text = { Text("Gruppen") },
-                        icon = { Icon(Icons.Default.AccountTree, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                        text = { Text("Zusatzfelder") },
+                        icon = { Icon(Icons.Default.Tune, contentDescription = null, modifier = Modifier.size(18.dp)) }
                     )
                     Tab(
                         selected = activeSubTab == 2,
@@ -938,110 +944,17 @@ fun DmsExplorerView(
                 }
             }
         } else if (activeSubTab == 1) {
-            // 2. INTERAKTIVE BAUM-STRUKTUR (TREE VIEW) FÜR DOKUMENT-TYPEN
-            // Nach Doc-Typ gruppiert, jeweils bei Bedarf aufklappbar
-            val groupedByType = remember(documents) {
-                documents.groupBy { if (it.docType.isNotBlank()) it.docType else "Ohne Doc-Typ" }
-            }
-            val allTypeKeys = groupedByType.keys.toList()
-
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                contentPadding = PaddingValues(vertical = 12.dp)
-            ) {
-                // Tree Header Aktionen (Alle aufklappen / zuklappen & Neue Gruppe erstellen)
-                item(key = "tree_view_action_bar") {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 6.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Dokumenten Gruppen",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                            TextButton(
-                                onClick = { expandedDocTypes = allTypeKeys.toSet() },
-                                contentPadding = PaddingValues(horizontal = 6.dp)
-                            ) {
-                                Text("Alle auf", style = MaterialTheme.typography.labelSmall)
-                            }
-                            TextButton(
-                                onClick = { expandedDocTypes = emptySet() },
-                                contentPadding = PaddingValues(horizontal = 6.dp)
-                            ) {
-                                Text("Alle zu", style = MaterialTheme.typography.labelSmall)
-                            }
-                            FilledTonalButton(
-                                onClick = { showCreateDocTypeDialog = true },
-                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                                modifier = Modifier.testTag("btn_create_doc_group")
-                            ) {
-                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Gruppe", style = MaterialTheme.typography.labelMedium)
-                            }
-                        }
-                    }
-                }
-
-                // Jeder Doc-Typ als interaktiver Baum-Knoten
-                groupedByType.forEach { (docTypeName, typeDocs) ->
-                    val isExpanded = expandedDocTypes.contains(docTypeName)
-                    val docTypeColor = docTypes.firstOrNull { it.name == docTypeName }?.colorHex ?: 0xFF2563EB
-
-                    item(key = "tree_node_$docTypeName") {
-                        DocTypeTreeNodeHeader(
-                            docTypeName = docTypeName,
-                            docCount = typeDocs.size,
-                            isExpanded = isExpanded,
-                            colorHex = docTypeColor,
-                            onToggle = {
-                                expandedDocTypes = if (isExpanded) {
-                                    expandedDocTypes - docTypeName
-                                } else {
-                                    expandedDocTypes + docTypeName
-                                }
-                            }
-                        )
-                    }
-
-                    // Untergeordnete Dokumente im aufgeklappten Zustand
-                    if (isExpanded) {
-                        items(typeDocs, key = { "tree_item_${docTypeName}_${it.id}" }) { doc ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(start = 24.dp)
-                            ) {
-                                // Visuelle Baum-Führungslinie
-                                Box(
-                                    modifier = Modifier
-                                        .width(2.dp)
-                                        .height(72.dp)
-                                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
-                                )
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Box(modifier = Modifier.weight(1f)) {
-                                    DocumentCard(
-                                        document = doc,
-                                        searchQuery = searchQuery,
-                                        onClick = { selectedDocumentForDetail = doc }
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+            // 2. VORDEFINIERTE & GLOBALE ZUSATZFELDER
+            CustomFieldsManagementTab(
+                customFields = customFields,
+                customFieldValues = allCustomFieldValues,
+                documents = allDocs,
+                availableMainCategories = availableMainCategories,
+                onAddFieldClick = { showCreateCustomFieldDialog = true },
+                onEditField = { fieldToEdit = it },
+                onDeleteField = { viewModel.deleteCustomField(it) },
+                onSelectDocument = { selectedDocumentForDetail = it }
+            )
         } else if (activeSubTab == 2) {
             // 3. FRISTEN- & KALENDER-ZENTRALE
             CalendarAndDeadlinesTab(
@@ -1389,6 +1302,11 @@ fun DmsExplorerView(
         DocumentDetailModal(
             document = doc,
             availableDocTypes = docTypes,
+            allCustomFields = customFields,
+            documentCustomFieldValues = allCustomFieldValues,
+            onUpdateCustomFieldValue = { docId, fieldId, value ->
+                viewModel.setDocumentCustomFieldValue(docId, fieldId, value)
+            },
             onUpdateDocType = { docId, newType ->
                 viewModel.updateDocumentDocType(docId, newType)
             },
@@ -1471,6 +1389,27 @@ fun DmsExplorerView(
             onConfirm = {
                 viewModel.deleteFolderStructure(mainCat, subCat, deleteContainedDocuments = true)
                 folderToDelete = null
+            }
+        )
+    }
+
+    // DIALOG: ZUSATZFELD ANLEGEN ODER BEARBEITEN
+    if (showCreateCustomFieldDialog || fieldToEdit != null) {
+        CreateOrEditCustomFieldDialog(
+            existingField = fieldToEdit,
+            availableMainCategories = availableMainCategories,
+            onDismiss = {
+                showCreateCustomFieldDialog = false
+                fieldToEdit = null
+            },
+            onConfirm = { field ->
+                if (fieldToEdit != null) {
+                    viewModel.updateCustomField(field)
+                } else {
+                    viewModel.addCustomField(field)
+                }
+                showCreateCustomFieldDialog = false
+                fieldToEdit = null
             }
         )
     }
@@ -2891,4 +2830,409 @@ private fun AiDocumentAssistantDialog(
             Spacer(modifier = Modifier.height(16.dp))
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CustomFieldsManagementTab(
+    customFields: List<com.example.model.CustomFieldEntity>,
+    customFieldValues: List<com.example.model.DocumentCustomFieldValueEntity>,
+    documents: List<DocumentEntity>,
+    availableMainCategories: List<String>,
+    onAddFieldClick: () -> Unit,
+    onEditField: (com.example.model.CustomFieldEntity) -> Unit,
+    onDeleteField: (String) -> Unit,
+    onSelectDocument: (DocumentEntity) -> Unit
+) {
+    var selectedScopeFilter by remember { mutableStateOf("ALL") }
+
+    val filteredFields = remember(customFields, selectedScopeFilter) {
+        when (selectedScopeFilter) {
+            "GLOBAL" -> customFields.filter { it.scope == com.example.model.CustomFieldScope.GLOBAL }
+            "FOLDER" -> customFields.filter { it.scope == com.example.model.CustomFieldScope.FOLDER_SPECIFIC }
+            else -> customFields
+        }
+    }
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(vertical = 12.dp)
+    ) {
+        item(key = "custom_fields_header") {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "Vordefinierte & Globale Zusatzfelder",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "Zusatzfelder können per Regel oder manuell bestimmten Dokumenten zugewiesen werden.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        FilterChip(
+                            selected = selectedScopeFilter == "ALL",
+                            onClick = { selectedScopeFilter = "ALL" },
+                            label = { Text("Alle (${customFields.size})") }
+                        )
+                        FilterChip(
+                            selected = selectedScopeFilter == "GLOBAL",
+                            onClick = { selectedScopeFilter = "GLOBAL" },
+                            label = { Text("Global") }
+                        )
+                        FilterChip(
+                            selected = selectedScopeFilter == "FOLDER",
+                            onClick = { selectedScopeFilter = "FOLDER" },
+                            label = { Text("Ordner-spezifisch") }
+                        )
+                    }
+
+                    FilledTonalButton(
+                        onClick = onAddFieldClick,
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                        modifier = Modifier.testTag("btn_add_custom_field")
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Neues Feld", style = MaterialTheme.typography.labelMedium)
+                    }
+                }
+            }
+        }
+
+        if (filteredFields.isEmpty()) {
+            item(key = "empty_custom_fields") {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.padding(24.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Tune,
+                            contentDescription = null,
+                            modifier = Modifier.size(48.dp),
+                            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = "Keine Zusatzfelder in dieser Kategorie",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Erstelle ein neues Zusatzfeld, um Verträgen oder Dokumenten Beträge, Fristen und Status-Metadaten zuzuweisen.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            }
+        }
+
+        items(filteredFields, key = { it.id }) { field ->
+            val assignedValues = customFieldValues.filter { it.customFieldId == field.id && it.fieldValue.isNotBlank() }
+            val assignedDocIds = assignedValues.map { it.documentId }.toSet()
+            val assignedDocs = documents.filter { assignedDocIds.contains(it.id) }
+            var isExpanded by remember { mutableStateOf(false) }
+            var showMenu by remember { mutableStateOf(false) }
+
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.weight(1f)) {
+                            Icon(
+                                imageVector = when (field.type) {
+                                    com.example.model.CustomFieldType.AMOUNT -> Icons.Default.AttachMoney
+                                    com.example.model.CustomFieldType.DATE -> Icons.Default.Event
+                                    com.example.model.CustomFieldType.SELECTION -> Icons.Default.List
+                                    com.example.model.CustomFieldType.BOOLEAN -> Icons.Default.CheckCircleOutline
+                                    else -> Icons.Default.TextFields
+                                },
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+
+                            Column {
+                                Text(
+                                    text = field.name,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                if (field.description.isNotBlank()) {
+                                    Text(
+                                        text = field.description,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+
+                        Box {
+                            IconButton(onClick = { showMenu = true }, modifier = Modifier.size(28.dp)) {
+                                Icon(Icons.Default.MoreVert, contentDescription = null, modifier = Modifier.size(18.dp))
+                            }
+                            DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                                DropdownMenuItem(
+                                    text = { Text("Bearbeiten") },
+                                    leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
+                                    onClick = {
+                                        showMenu = false
+                                        onEditField(field)
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Löschen", color = MaterialTheme.colorScheme.error) },
+                                    leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+                                    onClick = {
+                                        showMenu = false
+                                        onDeleteField(field.id)
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(shape = RoundedCornerShape(6.dp), color = MaterialTheme.colorScheme.primaryContainer) {
+                            Text(
+                                text = field.type.label,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = if (field.scope == com.example.model.CustomFieldScope.GLOBAL) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.tertiaryContainer
+                        ) {
+                            Text(
+                                text = if (field.scope == com.example.model.CustomFieldScope.GLOBAL) "Global" else "Ordner: ${field.targetMainCategory.ifBlank { "Alle" }}",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = if (field.scope == com.example.model.CustomFieldScope.GLOBAL) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.tertiary,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.weight(1f))
+
+                        if (assignedDocs.isNotEmpty()) {
+                            TextButton(
+                                onClick = { isExpanded = !isExpanded },
+                                contentPadding = PaddingValues(horizontal = 6.dp)
+                            ) {
+                                Text("${assignedDocs.size} Dok.", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                                Icon(if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore, contentDescription = null, modifier = Modifier.size(16.dp))
+                            }
+                        } else {
+                            Text(
+                                text = "Keine Zuweisung",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                            )
+                        }
+                    }
+
+                    if (isExpanded && assignedDocs.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        assignedDocs.forEach { doc ->
+                            val valItem = assignedValues.find { it.documentId == doc.id }
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MaterialTheme.colorScheme.surface,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 2.dp)
+                                    .clickable { onSelectDocument(doc) }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(8.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(doc.title, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Text(doc.sender, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                    if (valItem != null) {
+                                        Surface(shape = RoundedCornerShape(4.dp), color = MaterialTheme.colorScheme.primaryContainer) {
+                                            Text(valItem.fieldValue, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CreateOrEditCustomFieldDialog(
+    existingField: com.example.model.CustomFieldEntity?,
+    availableMainCategories: List<String>,
+    onDismiss: () -> Unit,
+    onConfirm: (com.example.model.CustomFieldEntity) -> Unit
+) {
+    var name by remember { mutableStateOf(existingField?.name.orEmpty()) }
+    var description by remember { mutableStateOf(existingField?.description.orEmpty()) }
+    var selectedType by remember { mutableStateOf(existingField?.type ?: com.example.model.CustomFieldType.TEXT) }
+    var options by remember { mutableStateOf(existingField?.options.orEmpty()) }
+    var selectedScope by remember { mutableStateOf(existingField?.scope ?: com.example.model.CustomFieldScope.GLOBAL) }
+    var targetMainCat by remember { mutableStateOf(existingField?.targetMainCategory.orEmpty()) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (existingField != null) "Zusatzfeld bearbeiten" else "Neues Zusatzfeld anlegen", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.verticalScroll(rememberScrollState())
+            ) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Feldbezeichnung (z. B. Monatliche Kosten)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text("Beschreibung (optional)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Text("Feldtyp:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
+                    com.example.model.CustomFieldType.values().forEach { t ->
+                        FilterChip(
+                            selected = selectedType == t,
+                            onClick = { selectedType = t },
+                            label = { Text(t.label, fontSize = 11.sp) }
+                        )
+                    }
+                }
+
+                if (selectedType == com.example.model.CustomFieldType.SELECTION) {
+                    OutlinedTextField(
+                        value = options,
+                        onValueChange = { options = it },
+                        label = { Text("Auswahloptionen (kommagetrennt)") },
+                        placeholder = { Text("Bezahlt,Offen,Prüfen,Gekündigt") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
+                Text("Geltungsbereich (Scope):", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    FilterChip(
+                        selected = selectedScope == com.example.model.CustomFieldScope.GLOBAL,
+                        onClick = { selectedScope = com.example.model.CustomFieldScope.GLOBAL },
+                        label = { Text("Global (Alle Ordner)") }
+                    )
+                    FilterChip(
+                        selected = selectedScope == com.example.model.CustomFieldScope.FOLDER_SPECIFIC,
+                        onClick = { selectedScope = com.example.model.CustomFieldScope.FOLDER_SPECIFIC },
+                        label = { Text("Ordner-spezifisch") }
+                    )
+                }
+
+                if (selectedScope == com.example.model.CustomFieldScope.FOLDER_SPECIFIC) {
+                    Text("Ziel-Ordner wählen:", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        availableMainCategories.forEach { cat ->
+                            FilterChip(
+                                selected = targetMainCat.equals(cat, ignoreCase = true),
+                                onClick = { targetMainCat = cat },
+                                label = { Text("📁 $cat") }
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (name.isNotBlank()) {
+                        val entity = existingField?.copy(
+                            name = name.trim(),
+                            description = description.trim(),
+                            type = selectedType,
+                            options = options.trim(),
+                            scope = selectedScope,
+                            targetMainCategory = targetMainCat
+                        ) ?: com.example.model.CustomFieldEntity(
+                            name = name.trim(),
+                            description = description.trim(),
+                            type = selectedType,
+                            options = options.trim(),
+                            scope = selectedScope,
+                            targetMainCategory = targetMainCat
+                        )
+                        onConfirm(entity)
+                    }
+                },
+                enabled = name.isNotBlank()
+            ) {
+                Text("Speichern")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Abbrechen")
+            }
+        }
+    )
 }

@@ -35,6 +35,14 @@ class DocRuleRepository(private val context: Context) {
                 val tagsArr = obj.optJSONArray("targetTags") ?: JSONArray()
                 val tags = (0 until tagsArr.length()).map { tagsArr.getString(it) }
 
+                val cfObj = obj.optJSONObject("targetCustomFields") ?: JSONObject()
+                val customFieldsMap = mutableMapOf<String, String>()
+                val cfKeys = cfObj.keys()
+                while (cfKeys.hasNext()) {
+                    val key = cfKeys.next()
+                    customFieldsMap[key] = cfObj.getString(key)
+                }
+
                 list.add(
                     DocRule(
                         id = obj.optString("id", java.util.UUID.randomUUID().toString()),
@@ -48,7 +56,8 @@ class DocRuleRepository(private val context: Context) {
                         targetTags = tags,
                         isEnabled = obj.optBoolean("isEnabled", true),
                         confidenceScore = obj.optDouble("confidenceScore", 1.0).toFloat(),
-                        isAiGenerated = obj.optBoolean("isAiGenerated", false)
+                        isAiGenerated = obj.optBoolean("isAiGenerated", false),
+                        targetCustomFields = customFieldsMap
                     )
                 )
             }
@@ -75,6 +84,9 @@ class DocRuleRepository(private val context: Context) {
                     put("isEnabled", r.isEnabled)
                     put("confidenceScore", r.confidenceScore.toDouble())
                     put("isAiGenerated", r.isAiGenerated)
+                    val cfObj = JSONObject()
+                    r.targetCustomFields.forEach { (k, v) -> cfObj.put(k, v) }
+                    put("targetCustomFields", cfObj)
                 }
                 arr.put(obj)
             }
