@@ -47,11 +47,11 @@ data class DocumentEntity(
 )
 
 enum class CustomFieldType(val label: String) {
-    TEXT("Freitext / Nummer"),
+    TEXT("Freitext"),
     AMOUNT("Betrag (€)"),
     DATE("Datum / Frist"),
-    SELECTION("Auswahl (Status)"),
-    BOOLEAN("Ja / Nein")
+    SELECTION("Auswahlliste (Status)"),
+    BOOLEAN("Ja / Nein (Schalter)")
 }
 
 enum class CustomFieldScope(val label: String) {
@@ -99,6 +99,53 @@ data class DocumentCustomFieldValueEntity(
 data class CustomFieldWithValue(
     val field: CustomFieldEntity,
     val value: String
+)
+
+enum class CashTransactionType(val label: String) {
+    WITHDRAWAL("Bargeld-Abhebung (Konto)"),
+    EXPENSE("Bar-Ausgabe / Quittung"),
+    INCOME("Bar-Einnahme"),
+    PRIVATE_WITHDRAWAL("Privatentnahme (ohne Betriebsausgabe)")
+}
+
+@Entity(
+    tableName = "cash_transactions",
+    indices = [
+        Index(value = ["date"]),
+        Index(value = ["type"])
+    ]
+)
+data class CashTransactionEntity(
+    @PrimaryKey
+    val id: String = java.util.UUID.randomUUID().toString(),
+    val title: String,
+    val amount: Double,
+    val type: CashTransactionType = CashTransactionType.EXPENSE,
+    val category: String = "Allgemein",
+    val date: Long = System.currentTimeMillis(),
+    val relatedDocumentId: Long? = null,
+    val note: String = "",
+    val isMatchedWithBankStatement: Boolean = false,
+    val matchReconciliationMonth: String? = null
+)
+
+@Entity(
+    tableName = "bank_statement_entries",
+    indices = [
+        Index(value = ["date"]),
+        Index(value = ["isCashWithdrawal"])
+    ]
+)
+data class BankStatementEntryEntity(
+    @PrimaryKey
+    val id: String = java.util.UUID.randomUUID().toString(),
+    val date: Long,
+    val bookingText: String,
+    val purpose: String,
+    val amount: Double,
+    val isCashWithdrawal: Boolean = false,
+    val matchedCashTransactionId: String? = null,
+    val monthYear: String = ""
 )
 
 data class ChatMessage(

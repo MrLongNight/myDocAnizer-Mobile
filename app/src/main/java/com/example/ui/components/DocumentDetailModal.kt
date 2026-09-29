@@ -273,11 +273,13 @@ fun DocumentDetailModal(
 
             // VORDEFINIERTE ZUSATZFELDER (CUSTOM FIELDS)
             val applicableFields = remember(allCustomFields, document) {
-                allCustomFields.filter {
-                    it.scope == com.example.model.CustomFieldScope.GLOBAL ||
-                    it.targetMainCategory.isBlank() ||
-                    it.targetMainCategory.equals(document.mainCategory, ignoreCase = true)
-                }
+                allCustomFields
+                    .filter {
+                        it.scope == com.example.model.CustomFieldScope.GLOBAL ||
+                        it.targetMainCategory.isBlank() ||
+                        it.targetMainCategory.equals(document.mainCategory, ignoreCase = true)
+                    }
+                    .distinctBy { it.name.trim().lowercase() }
             }
 
             if (applicableFields.isNotEmpty()) {

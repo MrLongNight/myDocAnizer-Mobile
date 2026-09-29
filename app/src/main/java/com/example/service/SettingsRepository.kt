@@ -91,6 +91,49 @@ class SettingsRepository(context: Context) {
         _notifyReconciliationDiscrepancies.value = enabled
     }
 
+    // Dashboard anpassbare Widgets
+    private val _showKpiWidgets = MutableStateFlow(prefs.getBoolean("dashboard_show_kpi", true))
+    val showKpiWidgets: StateFlow<Boolean> = _showKpiWidgets.asStateFlow()
+    fun setShowKpiWidgets(show: Boolean) {
+        prefs.edit().putBoolean("dashboard_show_kpi", show).apply()
+        _showKpiWidgets.value = show
+    }
+
+    private val _showDeadlinesWidget = MutableStateFlow(prefs.getBoolean("dashboard_show_deadlines", true))
+    val showDeadlinesWidget: StateFlow<Boolean> = _showDeadlinesWidget.asStateFlow()
+    fun setShowDeadlinesWidget(show: Boolean) {
+        prefs.edit().putBoolean("dashboard_show_deadlines", show).apply()
+        _showDeadlinesWidget.value = show
+    }
+
+    private val _showFinanceWidget = MutableStateFlow(prefs.getBoolean("dashboard_show_finance", true))
+    val showFinanceWidget: StateFlow<Boolean> = _showFinanceWidget.asStateFlow()
+    fun setShowFinanceWidget(show: Boolean) {
+        prefs.edit().putBoolean("dashboard_show_finance", show).apply()
+        _showFinanceWidget.value = show
+    }
+
+    private val _showReconciliationWidget = MutableStateFlow(prefs.getBoolean("dashboard_show_reconciliation", true))
+    val showReconciliationWidget: StateFlow<Boolean> = _showReconciliationWidget.asStateFlow()
+    fun setShowReconciliationWidget(show: Boolean) {
+        prefs.edit().putBoolean("dashboard_show_reconciliation", show).apply()
+        _showReconciliationWidget.value = show
+    }
+
+    private val _showCategoryDistributionWidget = MutableStateFlow(prefs.getBoolean("dashboard_show_category_distribution", true))
+    val showCategoryDistributionWidget: StateFlow<Boolean> = _showCategoryDistributionWidget.asStateFlow()
+    fun setShowCategoryDistributionWidget(show: Boolean) {
+        prefs.edit().putBoolean("dashboard_show_category_distribution", show).apply()
+        _showCategoryDistributionWidget.value = show
+    }
+
+    private val _showSecurityScoreWidget = MutableStateFlow(prefs.getBoolean("dashboard_show_security_score", true))
+    val showSecurityScoreWidget: StateFlow<Boolean> = _showSecurityScoreWidget.asStateFlow()
+    fun setShowSecurityScoreWidget(show: Boolean) {
+        prefs.edit().putBoolean("dashboard_show_security_score", show).apply()
+        _showSecurityScoreWidget.value = show
+    }
+
     // Dark / Light Theme Einstellung: "SYSTEM", "DARK", "LIGHT"
     private val _themeMode = MutableStateFlow(prefs.getString("app_theme_mode", "DARK") ?: "DARK")
     val themeMode: StateFlow<String> = _themeMode.asStateFlow()

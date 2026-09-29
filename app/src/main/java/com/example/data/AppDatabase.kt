@@ -6,6 +6,8 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.example.model.BankStatementEntryEntity
+import com.example.model.CashTransactionEntity
 import com.example.model.CustomFieldEntity
 import com.example.model.DocumentCustomFieldValueEntity
 import com.example.model.DocumentEntity
@@ -14,14 +16,17 @@ import com.example.model.DocumentEntity
     entities = [
         DocumentEntity::class,
         CustomFieldEntity::class,
-        DocumentCustomFieldValueEntity::class
+        DocumentCustomFieldValueEntity::class,
+        CashTransactionEntity::class,
+        BankStatementEntryEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun documentDao(): DocumentDao
     abstract fun customFieldDao(): CustomFieldDao
+    abstract fun financeDao(): FinanceDao
 
     companion object {
         @Volatile
@@ -71,6 +76,44 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `cash_transactions` (
+                        `id` TEXT NOT NULL,
+                        `title` TEXT NOT NULL,
+                        `amount` REAL NOT NULL,
+                        `type` TEXT NOT NULL,
+                        `category` TEXT NOT NULL,
+                        `date` INTEGER NOT NULL,
+                        `relatedDocumentId` INTEGER,
+                        `note` TEXT NOT NULL,
+                        `isMatchedWithBankStatement` INTEGER NOT NULL,
+                        `matchReconciliationMonth` TEXT,
+                        PRIMARY KEY(`id`)
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_cash_transactions_date` ON `cash_transactions` (`date`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_cash_transactions_type` ON `cash_transactions` (`type`)")
+
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `bank_statement_entries` (
+                        `id` TEXT NOT NULL,
+                        `date` INTEGER NOT NULL,
+                        `bookingText` TEXT NOT NULL,
+                        `purpose` TEXT NOT NULL,
+                        `amount` REAL NOT NULL,
+                        `isCashWithdrawal` INTEGER NOT NULL,
+                        `matchedCashTransactionId` TEXT,
+                        `monthYear` TEXT NOT NULL,
+                        PRIMARY KEY(`id`)
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_bank_statement_entries_date` ON `bank_statement_entries` (`date`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_bank_statement_entries_isCashWithdrawal` ON `bank_statement_entries` (`isCashWithdrawal`)")
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -78,7 +121,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "mydocanizer_database"
                 )
-                    .addMigrations(MIGRATION_3_4, MIGRATION_4_5)
+                    .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                     .fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = instance

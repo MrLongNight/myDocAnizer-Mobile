@@ -1398,6 +1398,7 @@ fun DmsExplorerView(
         CreateOrEditCustomFieldDialog(
             existingField = fieldToEdit,
             availableMainCategories = availableMainCategories,
+            allCustomFields = customFields,
             onDismiss = {
                 showCreateCustomFieldDialog = false
                 fieldToEdit = null
@@ -2846,11 +2847,15 @@ private fun CustomFieldsManagementTab(
 ) {
     var selectedScopeFilter by remember { mutableStateOf("ALL") }
 
-    val filteredFields = remember(customFields, selectedScopeFilter) {
+    val distinctFields = remember(customFields) {
+        customFields.distinctBy { it.name.trim().lowercase() }
+    }
+
+    val filteredFields = remember(distinctFields, selectedScopeFilter) {
         when (selectedScopeFilter) {
-            "GLOBAL" -> customFields.filter { it.scope == com.example.model.CustomFieldScope.GLOBAL }
-            "FOLDER" -> customFields.filter { it.scope == com.example.model.CustomFieldScope.FOLDER_SPECIFIC }
-            else -> customFields
+            "GLOBAL" -> distinctFields.filter { it.scope == com.example.model.CustomFieldScope.GLOBAL }
+            "FOLDER" -> distinctFields.filter { it.scope == com.example.model.CustomFieldScope.FOLDER_SPECIFIC }
+            else -> distinctFields
         }
     }
 
@@ -3119,6 +3124,7 @@ private fun CustomFieldsManagementTab(
 private fun CreateOrEditCustomFieldDialog(
     existingField: com.example.model.CustomFieldEntity?,
     availableMainCategories: List<String>,
+    allCustomFields: List<com.example.model.CustomFieldEntity> = emptyList(),
     onDismiss: () -> Unit,
     onConfirm: (com.example.model.CustomFieldEntity) -> Unit
 ) {
@@ -3128,6 +3134,13 @@ private fun CreateOrEditCustomFieldDialog(
     var options by remember { mutableStateOf(existingField?.options.orEmpty()) }
     var selectedScope by remember { mutableStateOf(existingField?.scope ?: com.example.model.CustomFieldScope.GLOBAL) }
     var targetMainCat by remember { mutableStateOf(existingField?.targetMainCategory.orEmpty()) }
+
+    val trimmedName = name.trim()
+    val isDuplicateName = remember(trimmedName, existingField, allCustomFields) {
+        trimmedName.isNotBlank() && allCustomFields.any {
+            it.id != existingField?.id && it.name.trim().equals(trimmedName, ignoreCase = true)
+        }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -3141,6 +3154,22 @@ private fun CreateOrEditCustomFieldDialog(
                     value = name,
                     onValueChange = { name = it },
                     label = { Text("Feldbezeichnung (z. B. Monatliche Kosten)") },
+                    isError = isDuplicateName,
+                    supportingText = {
+                        if (isDuplicateName) {
+                            Text(
+                                text = "Ein Zusatzfeld mit dieser Bezeichnung existiert bereits. Bitte eindeutige Feldbezeichnung eingeben.",
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        } else {
+                            Text(
+                                text = "Nur eindeutige Feldbezeichnungen erlaubt.",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -3154,13 +3183,48 @@ private fun CreateOrEditCustomFieldDialog(
                 )
 
                 Text("Feldtyp:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
-                    com.example.model.CustomFieldType.values().forEach { t ->
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
                         FilterChip(
-                            selected = selectedType == t,
-                            onClick = { selectedType = t },
-                            label = { Text(t.label, fontSize = 11.sp) }
+                            selected = selectedType == com.example.model.CustomFieldType.TEXT,
+                            onClick = { selectedType = com.example.model.CustomFieldType.TEXT },
+                            leadingIcon = { Icon(Icons.Default.TextFields, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                            label = { Text(com.example.model.CustomFieldType.TEXT.label, fontSize = 11.sp) },
+                            modifier = Modifier.weight(1f)
                         )
+                        FilterChip(
+                            selected = selectedType == com.example.model.CustomFieldType.AMOUNT,
+                            onClick = { selectedType = com.example.model.CustomFieldType.AMOUNT },
+                            leadingIcon = { Icon(Icons.Default.AttachMoney, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                            label = { Text(com.example.model.CustomFieldType.AMOUNT.label, fontSize = 11.sp) },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+                        FilterChip(
+                            selected = selectedType == com.example.model.CustomFieldType.DATE,
+                            onClick = { selectedType = com.example.model.CustomFieldType.DATE },
+                            leadingIcon = { Icon(Icons.Default.Event, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                            label = { Text(com.example.model.CustomFieldType.DATE.label, fontSize = 11.sp) },
+                            modifier = Modifier.weight(1f)
+                        )
+                        FilterChip(
+                            selected = selectedType == com.example.model.CustomFieldType.SELECTION,
+                            onClick = { selectedType = com.example.model.CustomFieldType.SELECTION },
+                            leadingIcon = { Icon(Icons.Default.List, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                            label = { Text(com.example.model.CustomFieldType.SELECTION.label, fontSize = 11.sp) },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+                        FilterChip(
+                            selected = selectedType == com.example.model.CustomFieldType.BOOLEAN,
+                            onClick = { selectedType = com.example.model.CustomFieldType.BOOLEAN },
+                            leadingIcon = { Icon(Icons.Default.CheckCircleOutline, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                            label = { Text(com.example.model.CustomFieldType.BOOLEAN.label, fontSize = 11.sp) },
+                            modifier = Modifier.weight(1f)
+                        )
+                        Spacer(modifier = Modifier.weight(1f))
                     }
                 }
 
@@ -3205,7 +3269,7 @@ private fun CreateOrEditCustomFieldDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    if (name.isNotBlank()) {
+                    if (name.isNotBlank() && !isDuplicateName) {
                         val entity = existingField?.copy(
                             name = name.trim(),
                             description = description.trim(),
@@ -3224,7 +3288,7 @@ private fun CreateOrEditCustomFieldDialog(
                         onConfirm(entity)
                     }
                 },
-                enabled = name.isNotBlank()
+                enabled = name.isNotBlank() && !isDuplicateName
             ) {
                 Text("Speichern")
             }

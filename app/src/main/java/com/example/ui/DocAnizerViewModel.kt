@@ -29,6 +29,7 @@ class DocAnizerViewModel(application: Application) : AndroidViewModel(applicatio
     private val db = AppDatabase.getDatabase(application)
     val documentDao = db.documentDao()
     val customFieldDao = db.customFieldDao()
+    val financeDao = db.financeDao()
     private val settingsRepo = SettingsRepository(application)
     val ruleRepo = DocRuleRepository(application)
     val llmService = LlmService(application)
@@ -65,15 +66,97 @@ class DocAnizerViewModel(application: Application) : AndroidViewModel(applicatio
     val notifyReconciliationDiscrepancies: StateFlow<Boolean> = settingsRepo.notifyReconciliationDiscrepancies
     fun setNotifyReconciliationDiscrepancies(enabled: Boolean) = settingsRepo.setNotifyReconciliationDiscrepancies(enabled)
 
+    // Dashboard anpassbare Widgets
+    val showKpiWidgets: StateFlow<Boolean> = settingsRepo.showKpiWidgets
+    fun setShowKpiWidgets(show: Boolean) = settingsRepo.setShowKpiWidgets(show)
+
+    val showDeadlinesWidget: StateFlow<Boolean> = settingsRepo.showDeadlinesWidget
+    fun setShowDeadlinesWidget(show: Boolean) = settingsRepo.setShowDeadlinesWidget(show)
+
+    val showFinanceWidget: StateFlow<Boolean> = settingsRepo.showFinanceWidget
+    fun setShowFinanceWidget(show: Boolean) = settingsRepo.setShowFinanceWidget(show)
+
+    val showReconciliationWidget: StateFlow<Boolean> = settingsRepo.showReconciliationWidget
+    fun setShowReconciliationWidget(show: Boolean) = settingsRepo.setShowReconciliationWidget(show)
+
+    val showCategoryDistributionWidget: StateFlow<Boolean> = settingsRepo.showCategoryDistributionWidget
+    fun setShowCategoryDistributionWidget(show: Boolean) = settingsRepo.setShowCategoryDistributionWidget(show)
+
+    val showSecurityScoreWidget: StateFlow<Boolean> = settingsRepo.showSecurityScoreWidget
+    fun setShowSecurityScoreWidget(show: Boolean) = settingsRepo.setShowSecurityScoreWidget(show)
+
+    // Bargeld-Transaktionen & Kontoauszüge
+    val cashTransactions: StateFlow<List<com.example.model.CashTransactionEntity>> = financeDao.getAllCashTransactions()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val bankStatementEntries: StateFlow<List<com.example.model.BankStatementEntryEntity>> = financeDao.getAllBankStatementEntries()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun addCashTransaction(tx: com.example.model.CashTransactionEntity) {
+        viewModelScope.launch(Dispatchers.IO) {
+            financeDao.insertCashTransaction(tx)
+        }
+    }
+
+    fun updateCashTransaction(tx: com.example.model.CashTransactionEntity) {
+        viewModelScope.launch(Dispatchers.IO) {
+            financeDao.updateCashTransaction(tx)
+        }
+    }
+
+    fun deleteCashTransaction(id: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            financeDao.deleteCashTransactionById(id)
+        }
+    }
+
+    fun importBankStatementEntries(entries: List<com.example.model.BankStatementEntryEntity>) {
+        viewModelScope.launch(Dispatchers.IO) {
+            financeDao.insertBankStatementEntries(entries)
+        }
+    }
+
+    fun deleteBankStatementEntry(id: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            financeDao.deleteBankStatementEntryById(id)
+        }
+    }
+
+    fun clearBankStatementEntries() {
+        viewModelScope.launch(Dispatchers.IO) {
+            financeDao.clearAllBankStatementEntries()
+        }
+    }
+
+    suspend fun addCustomFieldSync(field: com.example.model.CustomFieldEntity): Boolean {
+        val existing = customFieldDao.getAllCustomFieldsList()
+        // Nur eindeutige Feldbezeichnungen erlauben
+        if (existing.any { it.name.trim().equals(field.name.trim(), ignoreCase = true) }) {
+            return false
+        }
+        customFieldDao.insertCustomField(field)
+        return true
+    }
+
     fun addCustomField(field: com.example.model.CustomFieldEntity) {
         viewModelScope.launch(Dispatchers.IO) {
-            customFieldDao.insertCustomField(field)
+            addCustomFieldSync(field)
         }
+    }
+
+    suspend fun updateCustomFieldSync(field: com.example.model.CustomFieldEntity): Boolean {
+        val existing = customFieldDao.getAllCustomFieldsList()
+        // Nur eindeutige Feldbezeichnungen erlauben
+        if (existing.any { it.id != field.id && it.name.trim().equals(field.name.trim(), ignoreCase = true) }) {
+            return false
+        }
+        customFieldDao.updateCustomField(field)
+        return true
     }
 
     fun updateCustomField(field: com.example.model.CustomFieldEntity) {
         viewModelScope.launch(Dispatchers.IO) {
-            customFieldDao.updateCustomField(field)
+            updateCustomFieldSync(field)
         }
     }
 
@@ -1149,6 +1232,17 @@ class DocAnizerViewModel(application: Application) : AndroidViewModel(applicatio
                     )
                 )
                 presets.forEach { customFieldDao.insertCustomField(it) }
+            } else {
+                // Sicherstellen, dass nur eindeutige Feldbezeichnungen in der DB verbleiben
+                val seenNames = mutableSetOf<String>()
+                existingFields.forEach { f ->
+                    val key = f.name.trim().lowercase()
+                    if (seenNames.contains(key)) {
+                        customFieldDao.deleteCustomFieldById(f.id)
+                    } else {
+                        seenNames.add(key)
+                    }
+                }
             }
         }
 

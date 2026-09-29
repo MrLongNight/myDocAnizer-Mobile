@@ -11,6 +11,7 @@ import com.example.ui.DocAnizerViewModel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -85,5 +86,92 @@ class ExampleRobolectricTest {
     assertEquals(true, viewModel.enableMonthlyReconciliation.first())
     assertEquals(7, viewModel.reconciliationToleranceDays.first())
     assertEquals(true, viewModel.notifyReconciliationDiscrepancies.first())
+  }
+
+  @Test
+  fun `verify Dashboard widget configuration flow`() = runBlocking {
+    val app = ApplicationProvider.getApplicationContext<Application>()
+    val viewModel = DocAnizerViewModel(app)
+
+    viewModel.setShowKpiWidgets(true)
+    viewModel.setShowDeadlinesWidget(true)
+    viewModel.setShowFinanceWidget(true)
+    viewModel.setShowReconciliationWidget(true)
+    viewModel.setShowCategoryDistributionWidget(true)
+    viewModel.setShowSecurityScoreWidget(true)
+
+    assertEquals(true, viewModel.showKpiWidgets.first())
+    assertEquals(true, viewModel.showDeadlinesWidget.first())
+    assertEquals(true, viewModel.showFinanceWidget.first())
+    assertEquals(true, viewModel.showReconciliationWidget.first())
+    assertEquals(true, viewModel.showCategoryDistributionWidget.first())
+    assertEquals(true, viewModel.showSecurityScoreWidget.first())
+  }
+
+  @Test
+  fun `verify FinanceDao cash transactions and bank statements`() = runBlocking {
+    val context = ApplicationProvider.getApplicationContext<Application>()
+    val db = AppDatabase.getDatabase(context)
+    val dao = db.financeDao()
+
+    val cashTx = com.example.model.CashTransactionEntity(
+      id = "test_cash_1",
+      title = "Tanken Bar",
+      amount = 45.0,
+      type = com.example.model.CashTransactionType.EXPENSE,
+      matchReconciliationMonth = "2026-04"
+    )
+    dao.insertCashTransaction(cashTx)
+
+    val bankEntry = com.example.model.BankStatementEntryEntity(
+      id = "test_bank_1",
+      date = System.currentTimeMillis(),
+      bookingText = "Geldautomat Sparkasse",
+      purpose = "Barabhebung",
+      amount = -200.0,
+      isCashWithdrawal = true,
+      monthYear = "2026-04"
+    )
+    dao.insertBankStatementEntry(bankEntry)
+
+    val cashList = dao.getAllCashTransactionsList()
+    val bankList = dao.getAllBankStatementEntriesList()
+    val withdrawals = dao.getCashWithdrawalsForMonth("2026-04")
+
+    assertTrue(cashList.any { it.id == "test_cash_1" })
+    assertTrue(bankList.any { it.id == "test_bank_1" })
+    assertEquals(1, withdrawals.size)
+  }
+
+  @Test
+  fun `verify unique CustomFieldType labels and duplicate field name prevention`() = runBlocking {
+    val types = CustomFieldType.values()
+    val labels = types.map { it.label }
+    assertEquals(types.size, labels.distinct().size)
+
+    val app = ApplicationProvider.getApplicationContext<Application>()
+    val viewModel = DocAnizerViewModel(app)
+
+    val field1 = CustomFieldEntity(
+      id = "unique_field_1",
+      name = "Eindeutiger Belegstatus",
+      type = CustomFieldType.SELECTION,
+      options = "A,B"
+    )
+    val field2 = CustomFieldEntity(
+      id = "unique_field_2",
+      name = "Eindeutiger Belegstatus",
+      type = CustomFieldType.TEXT
+    )
+
+    val added1 = viewModel.addCustomFieldSync(field1)
+    val added2 = viewModel.addCustomFieldSync(field2)
+
+    assertTrue(added1)
+    assertFalse(added2) // Duplikat Name abgelehnt!
+
+    val dao = AppDatabase.getDatabase(app).customFieldDao()
+    val list = dao.getAllCustomFieldsList().filter { it.name.trim().equals("Eindeutiger Belegstatus", ignoreCase = true) }
+    assertEquals(1, list.size)
   }
 }

@@ -1088,8 +1088,6 @@ private fun StepIncomeExpenseConfig(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(4.dp))
-
                 // SPEZIAL-FUNKTION: AUTOMATISCHER MONATLICHER DATENABGLEICH (RECONCILIATION)
                 if (allThreeActive) {
                     Surface(

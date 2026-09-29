@@ -36,6 +36,7 @@ import com.example.ui.components.AppLogoBanner
 enum class MainNavigationTab {
     SCANNER,
     DOCANIZER,
+    DASHBOARD,
     BATCH_INBOX,
     IMPORT,
     SETTINGS
@@ -175,6 +176,31 @@ fun MainScreen(
                             },
                             colors = navItemColors,
                             modifier = Modifier.testTag("nav_item_docanizer")
+                        )
+
+                        val isDashboardSelected = currentTab == MainNavigationTab.DASHBOARD
+                        NavigationBarItem(
+                            selected = isDashboardSelected,
+                            onClick = {
+                                isFabExpanded = false
+                                currentTab = MainNavigationTab.DASHBOARD
+                            },
+                            icon = {
+                                Icon(
+                                    imageVector = if (isDashboardSelected) Icons.Default.Dashboard else Icons.Default.DashboardCustomize,
+                                    contentDescription = "Dashboard",
+                                    modifier = Modifier.size(if (isDashboardSelected) 26.dp else 22.dp)
+                                )
+                            },
+                            label = {
+                                Text(
+                                    text = "Dashboard",
+                                    fontWeight = if (isDashboardSelected) FontWeight.ExtraBold else FontWeight.Medium,
+                                    fontSize = if (isDashboardSelected) 13.sp else 12.sp
+                                )
+                            },
+                            colors = navItemColors,
+                            modifier = Modifier.testTag("nav_item_dashboard")
                         )
 
                         val isBatchSelected = currentTab == MainNavigationTab.BATCH_INBOX
@@ -361,6 +387,13 @@ fun MainScreen(
                         MainNavigationTab.DOCANIZER -> {
                             DmsExplorerView(
                                 viewModel = viewModel,
+                                onNavigateToImport = { currentTab = MainNavigationTab.IMPORT }
+                            )
+                        }
+                        MainNavigationTab.DASHBOARD -> {
+                            DashboardView(
+                                viewModel = viewModel,
+                                onNavigateToScan = { currentTab = MainNavigationTab.SCANNER },
                                 onNavigateToImport = { currentTab = MainNavigationTab.IMPORT }
                             )
                         }
