@@ -905,44 +905,75 @@ fun HuggingFaceModelsContent(
                                 modifier = Modifier.fillMaxWidth()
                             )
                             Spacer(modifier = Modifier.height(4.dp))
+                            val mbDownloaded = model.downloadedBytes / (1024 * 1024)
+                            val mbTotal = if (model.totalBytes > 0) model.totalBytes / (1024 * 1024) else model.downloadSizeMb.toLong()
                             Text(
-                                text = "Lade Modell von HuggingFace herunter... ${(model.downloadProgress * 100).toInt()}%",
+                                text = "Lade echtes Modell herunter: $mbDownloaded MB / $mbTotal MB (${(model.downloadProgress * 100).toInt()}%)",
                                 style = MaterialTheme.typography.labelSmall
                             )
                         }
                     } else {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.End,
+                            horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             if (!model.isDownloaded) {
+                                Text(
+                                    text = "Nicht auf Gerät (${model.downloadSizeMb} MB)",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                                 OutlinedButton(onClick = { viewModel.downloadModel(model.id) }) {
                                     Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Download (~${model.downloadSizeMb} MB)")
+                                    Text("Download (${model.downloadSizeMb} MB)")
                                 }
                             } else {
-                                if (!model.isSelected) {
-                                    Button(onClick = { viewModel.selectModel(model.id) }) {
-                                        Text("Als Standard aktivieren")
-                                    }
-                                } else {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.CheckCircle,
+                                        contentDescription = null,
+                                        tint = Color(0xFF10B981),
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    val sizeMb = if (model.localFileSizeBytes > 0) model.localFileSizeBytes / (1024 * 1024) else model.downloadSizeMb.toLong()
+                                    Text(
+                                        text = "$sizeMb MB auf Gerät",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = Color(0xFF10B981)
+                                    )
+                                    IconButton(
+                                        onClick = { viewModel.deleteModel(model.id) },
+                                        modifier = Modifier.size(28.dp)
                                     ) {
                                         Icon(
-                                            imageVector = Icons.Default.CheckCircle,
-                                            contentDescription = null,
-                                            tint = Color(0xFF10B981),
+                                            Icons.Default.DeleteOutline,
+                                            contentDescription = "Modell löschen",
+                                            tint = MaterialTheme.colorScheme.error,
                                             modifier = Modifier.size(16.dp)
                                         )
+                                    }
+                                }
+
+                                if (!model.isSelected) {
+                                    Button(onClick = { viewModel.selectModel(model.id) }) {
+                                        Text("Aktivieren")
+                                    }
+                                } else {
+                                    Surface(
+                                        color = Color(0xFF10B981).copy(alpha = 0.15f),
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
                                         Text(
-                                            text = "Aktiv für On-Device Erkennung",
+                                            text = "Aktiv",
                                             color = Color(0xFF10B981),
                                             fontWeight = FontWeight.Bold,
-                                            style = MaterialTheme.typography.bodySmall
+                                            style = MaterialTheme.typography.labelMedium,
+                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
                                         )
                                     }
                                 }

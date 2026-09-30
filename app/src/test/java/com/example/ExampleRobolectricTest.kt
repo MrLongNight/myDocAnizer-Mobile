@@ -422,4 +422,30 @@ class ExampleRobolectricTest {
     assertTrue(content.contains("myDocAnizer-Mobile - DIAGNOSE & AUDIT-PROTOKOLL"))
     assertTrue(content.contains("TestInference"))
   }
+
+  @Test
+  fun `verify real model file management and disk operations`() {
+    val app = ApplicationProvider.getApplicationContext<Application>()
+    val viewModel = DocAnizerViewModel(app)
+
+    val modelId = "smollm2-135m-instruct"
+    val modelFile = viewModel.llmService.getModelFile(modelId)
+    assertNotNull(modelFile)
+    assertTrue(modelFile.name.endsWith(".gguf"))
+
+    // Test creating and deleting a simulated model file
+    modelFile.parentFile?.mkdirs()
+    modelFile.writeBytes(byteArrayOf(0x47, 0x47, 0x55, 0x46, 0x01, 0x00)) // GGUF header
+    assertTrue(modelFile.exists())
+
+    viewModel.refreshHardwareInfo()
+    val model = viewModel.llmService.availableModels.value.find { it.id == modelId }
+    assertNotNull(model)
+    assertTrue(model!!.downloadUrl.startsWith("https://huggingface.co/"))
+
+    viewModel.deleteModel(modelId)
+    assertFalse(modelFile.exists())
+    val afterDelete = viewModel.llmService.availableModels.value.find { it.id == modelId }
+    assertFalse(afterDelete!!.isDownloaded)
+  }
 }

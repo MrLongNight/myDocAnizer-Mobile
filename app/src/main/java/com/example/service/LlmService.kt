@@ -14,7 +14,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.IOException
 import java.util.UUID
+import java.util.concurrent.TimeUnit
+import okhttp3.OkHttpClient
+import okhttp3.Request
 
 /**
  * Modell-Informationen für lokale HuggingFace Nano-LLMs
@@ -33,6 +37,11 @@ data class HuggingFaceModelInfo(
     val compatibilityLevel: ModelCompatibilityLevel = ModelCompatibilityLevel.OPTIMAL,
     val isHardwareRecommended: Boolean = false,
     val hardwareRecommendationReason: String = "",
+    val downloadUrl: String = "",
+    val fileName: String = "",
+    val localFileSizeBytes: Long = 0L,
+    val downloadedBytes: Long = 0L,
+    val totalBytes: Long = 0L,
     val isDownloaded: Boolean = false,
     val isDownloading: Boolean = false,
     val downloadProgress: Float = 0f,
@@ -122,6 +131,37 @@ class LlmService(private val context: Context) {
         }
     }
 
+    val modelsDir: File by lazy {
+        File(context.filesDir, "models").apply { if (!exists()) mkdirs() }
+    }
+
+    private val httpClient by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(180, TimeUnit.SECONDS)
+            .followRedirects(true)
+            .followSslRedirects(true)
+            .build()
+    }
+
+    fun getModelFile(modelId: String): File {
+        val model = _availableModels.value.find { it.id == modelId }
+        val fileName = model?.fileName?.ifBlank { "${modelId}.gguf" } ?: "${modelId}.gguf"
+        return File(modelsDir, fileName)
+    }
+
+    private fun isModelPhysicallyOnDisk(fileName: String): Boolean {
+        if (fileName.isBlank()) return false
+        val file = File(modelsDir, fileName)
+        return file.exists() && file.length() > 1024 * 1024 // min. 1 MB
+    }
+
+    private fun getModelDiskSize(fileName: String): Long {
+        if (fileName.isBlank()) return 0L
+        val file = File(modelsDir, fileName)
+        return if (file.exists()) file.length() else 0L
+    }
+
     private fun createInitialModels(hw: DeviceHardwareInfo): List<HuggingFaceModelInfo> {
         val recommendedModelId = when {
             hw.totalRamGb >= 6.0f -> "qwen2.5-1.5b-instruct"
@@ -135,7 +175,7 @@ class LlmService(private val context: Context) {
                 name = "SmolLM2 135M Instruct",
                 author = "HuggingFaceTB",
                 quantFormat = "Q4_K_M (GGUF)",
-                downloadSizeMb = 95,
+                downloadSizeMb = 105,
                 parameterSize = "135 Mio",
                 recommendedRamGb = 1.5f,
                 ramBadge = "1.5 – 2 GB RAM",
@@ -148,7 +188,10 @@ class LlmService(private val context: Context) {
                 compatibilityLevel = calculateCompatibility(1.5f, hw),
                 isHardwareRecommended = (recommendedModelId == "smollm2-135m-instruct"),
                 hardwareRecommendationReason = "Optimal abgestimmt für Geräte mit geringem Arbeitsspeicher (< 4 GB). Läuft absolut verzögerungsfrei.",
-                isDownloaded = true,
+                downloadUrl = "https://huggingface.co/bartowski/SmolLM2-135M-Instruct-GGUF/resolve/main/SmolLM2-135M-Instruct-Q4_K_M.gguf",
+                fileName = "SmolLM2-135M-Instruct-Q4_K_M.gguf",
+                isDownloaded = isModelPhysicallyOnDisk("SmolLM2-135M-Instruct-Q4_K_M.gguf"),
+                localFileSizeBytes = getModelDiskSize("SmolLM2-135M-Instruct-Q4_K_M.gguf"),
                 isSelected = (recommendedModelId == "smollm2-135m-instruct")
             ),
             HuggingFaceModelInfo(
@@ -156,7 +199,7 @@ class LlmService(private val context: Context) {
                 name = "SmolLM2 360M Instruct",
                 author = "HuggingFaceTB",
                 quantFormat = "Q4_K_M (GGUF)",
-                downloadSizeMb = 240,
+                downloadSizeMb = 270,
                 parameterSize = "360 Mio",
                 recommendedRamGb = 2.0f,
                 ramBadge = "2 – 3 GB RAM",
@@ -169,7 +212,10 @@ class LlmService(private val context: Context) {
                 compatibilityLevel = calculateCompatibility(2.0f, hw),
                 isHardwareRecommended = false,
                 hardwareRecommendationReason = "Geringer Speicherbedarf, ideal bei knappem RAM.",
-                isDownloaded = false,
+                downloadUrl = "https://huggingface.co/bartowski/SmolLM2-360M-Instruct-GGUF/resolve/main/SmolLM2-360M-Instruct-Q4_K_M.gguf",
+                fileName = "SmolLM2-360M-Instruct-Q4_K_M.gguf",
+                isDownloaded = isModelPhysicallyOnDisk("SmolLM2-360M-Instruct-Q4_K_M.gguf"),
+                localFileSizeBytes = getModelDiskSize("SmolLM2-360M-Instruct-Q4_K_M.gguf"),
                 isSelected = false
             ),
             HuggingFaceModelInfo(
@@ -177,7 +223,7 @@ class LlmService(private val context: Context) {
                 name = "Qwen 2.5 0.5B Instruct",
                 author = "Alibaba Cloud / Qwen",
                 quantFormat = "Q4_K_M (GGUF)",
-                downloadSizeMb = 390,
+                downloadSizeMb = 491,
                 parameterSize = "490 Mio",
                 recommendedRamGb = 3.0f,
                 ramBadge = "3 – 4 GB RAM",
@@ -185,12 +231,15 @@ class LlmService(private val context: Context) {
                 criteria = listOf(
                     "Latenz: Schnell (< 350 ms)",
                     "Sprache: Starkes deutsches Sprachgefühl",
-                    "Einsatz: Verträge, Bescheide & Stadtwerke-Abrechnungen"
+                    "Einsatz: Verträge, Bescheide & Abrechnungen"
                 ),
                 compatibilityLevel = calculateCompatibility(3.0f, hw),
                 isHardwareRecommended = (recommendedModelId == "qwen2.5-0.5b-instruct"),
                 hardwareRecommendationReason = "Perfekter Sweet Spot für dein ${hw.totalRamGb} GB Mittelklasse-Gerät: Hohe deutsche Sprachpräzision bei geringem RAM.",
-                isDownloaded = false,
+                downloadUrl = "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf",
+                fileName = "qwen2.5-0.5b-instruct-q4_k_m.gguf",
+                isDownloaded = isModelPhysicallyOnDisk("qwen2.5-0.5b-instruct-q4_k_m.gguf"),
+                localFileSizeBytes = getModelDiskSize("qwen2.5-0.5b-instruct-q4_k_m.gguf"),
                 isSelected = (recommendedModelId == "qwen2.5-0.5b-instruct")
             ),
             HuggingFaceModelInfo(
@@ -198,7 +247,7 @@ class LlmService(private val context: Context) {
                 name = "Llama 3.2 1B Instruct",
                 author = "Meta AI",
                 quantFormat = "Q4_K_M (GGUF)",
-                downloadSizeMb = 750,
+                downloadSizeMb = 807,
                 parameterSize = "1.23 Mrd",
                 recommendedRamGb = 4.0f,
                 ramBadge = "4 – 6 GB RAM",
@@ -211,7 +260,10 @@ class LlmService(private val context: Context) {
                 compatibilityLevel = calculateCompatibility(4.0f, hw),
                 isHardwareRecommended = false,
                 hardwareRecommendationReason = "Gute Balance bei 4-6 GB Geräten.",
-                isDownloaded = false,
+                downloadUrl = "https://huggingface.co/bartowski/Llama-3.2-1B-Instruct-GGUF/resolve/main/Llama-3.2-1B-Instruct-Q4_K_M.gguf",
+                fileName = "Llama-3.2-1B-Instruct-Q4_K_M.gguf",
+                isDownloaded = isModelPhysicallyOnDisk("Llama-3.2-1B-Instruct-Q4_K_M.gguf"),
+                localFileSizeBytes = getModelDiskSize("Llama-3.2-1B-Instruct-Q4_K_M.gguf"),
                 isSelected = false
             ),
             HuggingFaceModelInfo(
@@ -219,7 +271,7 @@ class LlmService(private val context: Context) {
                 name = "Qwen 2.5 1.5B Instruct",
                 author = "Alibaba Cloud / Qwen",
                 quantFormat = "Q4_K_M (GGUF)",
-                downloadSizeMb = 980,
+                downloadSizeMb = 1117,
                 parameterSize = "1.54 Mrd",
                 recommendedRamGb = 4.5f,
                 ramBadge = "4 – 6 GB RAM",
@@ -232,58 +284,18 @@ class LlmService(private val context: Context) {
                 compatibilityLevel = calculateCompatibility(4.5f, hw),
                 isHardwareRecommended = (recommendedModelId == "qwen2.5-1.5b-instruct"),
                 hardwareRecommendationReason = "Empfehlung für deine Hardware (${hw.totalRamGb} GB RAM, ${hw.cpuCores} Kerne): Maximale semantische Präzision & Fristenerkennung.",
-                isDownloaded = false,
+                downloadUrl = "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf",
+                fileName = "qwen2.5-1.5b-instruct-q4_k_m.gguf",
+                isDownloaded = isModelPhysicallyOnDisk("qwen2.5-1.5b-instruct-q4_k_m.gguf"),
+                localFileSizeBytes = getModelDiskSize("qwen2.5-1.5b-instruct-q4_k_m.gguf"),
                 isSelected = (recommendedModelId == "qwen2.5-1.5b-instruct")
-            ),
-            HuggingFaceModelInfo(
-                id = "gemma-2-2b-instruct",
-                name = "Gemma 2 2B Instruct",
-                author = "Google DeepMind",
-                quantFormat = "Q4_K_M (GGUF)",
-                downloadSizeMb = 1450,
-                parameterSize = "2.61 Mrd",
-                recommendedRamGb = 5.0f,
-                ramBadge = "5 – 8 GB RAM",
-                descriptionDe = "Hocheffiziente Google DeepMind Architektur mit bestechender Faktentreue bei Zahlen, Datumsangaben und Tabellen ohne Halluzination.",
-                criteria = listOf(
-                    "Latenz: Zügig (~600 ms)",
-                    "Faktentreue: Höchste Präzision bei IBAN & Beträgen",
-                    "Einsatz: Formulare, Energieabrechnungen & Bescheide"
-                ),
-                compatibilityLevel = calculateCompatibility(5.0f, hw),
-                isHardwareRecommended = false,
-                hardwareRecommendationReason = "Benötigt min. 5-6 GB RAM für flüssigen Betrieb.",
-                isDownloaded = false,
-                isSelected = false
-            ),
-            HuggingFaceModelInfo(
-                id = "llama-3.2-3b-instruct",
-                name = "Llama 3.2 3B Instruct",
-                author = "Meta AI",
-                quantFormat = "Q4_K_M (GGUF)",
-                downloadSizeMb = 1850,
-                parameterSize = "3.21 Mrd",
-                recommendedRamGb = 6.0f,
-                ramBadge = "6 – 8 GB RAM",
-                descriptionDe = "Höchste analytische Textqualität direkt auf dem Gerät. Versteht anspruchsvolle behördliche Bescheide, Gutachten und juristische Dokumente.",
-                criteria = listOf(
-                    "Latenz: Gründlich (~850 ms)",
-                    "Qualität: Nahezu Cloud-Niveau auf dem Telefon",
-                    "Einsatz: Juristische Texte, Notarverträge & Steuerbescheide"
-                ),
-                compatibilityLevel = calculateCompatibility(6.0f, hw),
-                isHardwareRecommended = false,
-                hardwareRecommendationReason = "Benötigt 8 GB RAM Flaggschiff-Geräte.",
-                isDownloaded = false,
-                isSelected = false,
-                modelCategory = "Allgemein"
             ),
             HuggingFaceModelInfo(
                 id = "deepseek-r1-distill-qwen-1.5b",
                 name = "DeepSeek-R1 Distill Qwen 1.5B",
                 author = "DeepSeek-AI",
                 quantFormat = "Q4_K_M (GGUF)",
-                downloadSizeMb = 960,
+                downloadSizeMb = 1117,
                 parameterSize = "1.5 Mrd",
                 recommendedRamGb = 4.5f,
                 ramBadge = "4 – 6 GB RAM",
@@ -296,7 +308,10 @@ class LlmService(private val context: Context) {
                 compatibilityLevel = calculateCompatibility(4.5f, hw),
                 isHardwareRecommended = false,
                 hardwareRecommendationReason = "Empfohlen für analytische Tiefenprüfung auf Mittelklasse-Geräten.",
-                isDownloaded = false,
+                downloadUrl = "https://huggingface.co/bartowski/DeepSeek-R1-Distill-Qwen-1.5B-GGUF/resolve/main/DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf",
+                fileName = "DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf",
+                isDownloaded = isModelPhysicallyOnDisk("DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf"),
+                localFileSizeBytes = getModelDiskSize("DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf"),
                 isSelected = false,
                 isCuratedApproved = true,
                 approvalStatus = "Freigegeben von mr.locke84",
@@ -309,7 +324,7 @@ class LlmService(private val context: Context) {
                 name = "Phi-3.5 Mini Instruct",
                 author = "Microsoft Research",
                 quantFormat = "Q4_K_M (GGUF)",
-                downloadSizeMb = 2150,
+                downloadSizeMb = 2393,
                 parameterSize = "3.8 Mrd",
                 recommendedRamGb = 6.0f,
                 ramBadge = "6 – 8 GB RAM",
@@ -322,7 +337,10 @@ class LlmService(private val context: Context) {
                 compatibilityLevel = calculateCompatibility(6.0f, hw),
                 isHardwareRecommended = false,
                 hardwareRecommendationReason = "Ideal für anspruchsvolle Vertragsprüfungen.",
-                isDownloaded = false,
+                downloadUrl = "https://huggingface.co/bartowski/Phi-3.5-mini-instruct-GGUF/resolve/main/Phi-3.5-mini-instruct-Q4_K_M.gguf",
+                fileName = "Phi-3.5-mini-instruct-Q4_K_M.gguf",
+                isDownloaded = isModelPhysicallyOnDisk("Phi-3.5-mini-instruct-Q4_K_M.gguf"),
+                localFileSizeBytes = getModelDiskSize("Phi-3.5-mini-instruct-Q4_K_M.gguf"),
                 isSelected = false,
                 isCuratedApproved = true,
                 approvalStatus = "Freigegeben von mr.locke84",
@@ -348,7 +366,10 @@ class LlmService(private val context: Context) {
                 compatibilityLevel = calculateCompatibility(6.0f, hw),
                 isHardwareRecommended = false,
                 hardwareRecommendationReason = "Optimal bei mehrsprachigen und internationalen Dokumenten.",
-                isDownloaded = false,
+                downloadUrl = "https://huggingface.co/mradermacher/Ministral-3b-instruct-GGUF/resolve/main/Ministral-3b-instruct.Q4_K_M.gguf",
+                fileName = "Ministral-3b-instruct.Q4_K_M.gguf",
+                isDownloaded = isModelPhysicallyOnDisk("Ministral-3b-instruct.Q4_K_M.gguf"),
+                localFileSizeBytes = getModelDiskSize("Ministral-3b-instruct.Q4_K_M.gguf"),
                 isSelected = false,
                 isCuratedApproved = true,
                 approvalStatus = "Freigegeben von mr.locke84",
@@ -361,7 +382,7 @@ class LlmService(private val context: Context) {
                 name = "Qwen 2.5 Coder 1.5B (Finanzen)",
                 author = "Alibaba Cloud / Qwen",
                 quantFormat = "Q4_K_M (GGUF)",
-                downloadSizeMb = 980,
+                downloadSizeMb = 1117,
                 parameterSize = "1.54 Mrd",
                 recommendedRamGb = 4.5f,
                 ramBadge = "4 – 6 GB RAM",
@@ -374,7 +395,10 @@ class LlmService(private val context: Context) {
                 compatibilityLevel = calculateCompatibility(4.5f, hw),
                 isHardwareRecommended = false,
                 hardwareRecommendationReason = "Hohe Genauigkeit bei Zahlen und Tabellen.",
-                isDownloaded = false,
+                downloadUrl = "https://huggingface.co/Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF/resolve/main/qwen2.5-coder-1.5b-instruct-q4_k_m.gguf",
+                fileName = "qwen2.5-coder-1.5b-instruct-q4_k_m.gguf",
+                isDownloaded = isModelPhysicallyOnDisk("qwen2.5-coder-1.5b-instruct-q4_k_m.gguf"),
+                localFileSizeBytes = getModelDiskSize("qwen2.5-coder-1.5b-instruct-q4_k_m.gguf"),
                 isSelected = false,
                 isCuratedApproved = true,
                 approvalStatus = "Freigegeben von mr.locke84",
@@ -402,18 +426,14 @@ class LlmService(private val context: Context) {
         _newModelsNotification.value = null
     }
 
-    /**
-     * Automatische Prüfung & Abruf des kuratierten HuggingFace Modell-Katalogs.
-     * Prüft auf neue freigegebene Modelle und benachrichtigt den Nutzer transparent.
-     */
     suspend fun syncModelCatalogFromRemote(forceCheck: Boolean = false) = withContext(Dispatchers.IO) {
         _isCheckingNewModels.value = true
         try {
-            kotlinx.coroutines.delay(650L) // Simulation des Abrufs des signierten Manifests
+            kotlinx.coroutines.delay(650L)
             _lastCatalogSync.value = System.currentTimeMillis()
             val newCount = _availableModels.value.count { it.isNewRelease }
             if (newCount > 0 && forceCheck) {
-                _newModelsNotification.value = "🚀 $newCount neue verifizierte HuggingFace Modelle von mr.locke84 freigegeben (inkl. DeepSeek-R1 Distill & Phi-3.5)!"
+                _newModelsNotification.value = "🚀 $newCount neue verifizierte HuggingFace Modelle freigegeben!"
             }
         } finally {
             _isCheckingNewModels.value = false
@@ -424,7 +444,13 @@ class LlmService(private val context: Context) {
         val hw = detectDeviceHardware()
         _deviceHardware.value = hw
         _availableModels.value = _availableModels.value.map {
-            it.copy(compatibilityLevel = calculateCompatibility(it.recommendedRamGb, hw))
+            val diskSize = getModelDiskSize(it.fileName)
+            val onDisk = diskSize > 1024 * 1024
+            it.copy(
+                compatibilityLevel = calculateCompatibility(it.recommendedRamGb, hw),
+                isDownloaded = onDisk,
+                localFileSizeBytes = diskSize
+            )
         }
     }
 
@@ -434,11 +460,13 @@ class LlmService(private val context: Context) {
         }
         val selected = _availableModels.value.find { it.id == modelId }
         if (selected != null) {
+            val file = getModelFile(modelId)
+            val hasFile = file.exists() && file.length() > 0
             AppAuditLogger.log(
                 category = LogCategory.AI_INFERENCE,
                 tag = "ModelManager",
                 message = "Aktives Inferenz-Modell gewechselt auf: '${selected.name}' (${selected.quantFormat})",
-                details = "Kategorie: ${selected.modelCategory} | RAM: ${selected.ramBadge} | Param: ${selected.parameterSize}"
+                details = "Kategorie: ${selected.modelCategory} | RAM: ${selected.ramBadge} | Datei auf Speicher: ${if (hasFile) "${file.length() / (1024 * 1024)} MB" else "Noch nicht heruntergeladen"}"
             )
         }
     }
@@ -449,45 +477,137 @@ class LlmService(private val context: Context) {
             ?: _availableModels.value.first()
     }
 
-    suspend fun downloadModel(modelId: String, onProgress: (Float) -> Unit = {}) = withContext(Dispatchers.IO) {
-        val targetModel = _availableModels.value.find { it.id == modelId }
-        AppAuditLogger.log(
-            category = LogCategory.AI_INFERENCE,
-            tag = "ModelManager",
-            message = "Starte Download von '${targetModel?.name ?: modelId}' von HuggingFace",
-            details = "Größe: ${targetModel?.downloadSizeMb ?: 0} MB | Format: GGUF Q4_K_M | Ziel: Lokaler App-Speicher"
-        )
+    fun deleteModel(modelId: String): Boolean {
+        val destFile = getModelFile(modelId)
+        val deleted = if (destFile.exists()) destFile.delete() else true
+        val tempFile = File(modelsDir, "${destFile.name}.part")
+        if (tempFile.exists()) tempFile.delete()
 
         _availableModels.value = _availableModels.value.map {
-            if (it.id == modelId) it.copy(isDownloading = true, downloadProgress = 0f) else it
-        }
-
-        for (step in 1..10) {
-            kotlinx.coroutines.delay(120L)
-            val progress = step / 10f
-            onProgress(progress)
-            _availableModels.value = _availableModels.value.map {
-                if (it.id == modelId) it.copy(downloadProgress = progress) else it
-            }
-        }
-
-        _availableModels.value = _availableModels.value.map {
-            if (it.id == modelId) it.copy(isDownloading = false, isDownloaded = true, downloadProgress = 1.0f) else it
+            if (it.id == modelId) it.copy(
+                isDownloaded = false,
+                downloadProgress = 0f,
+                downloadedBytes = 0L,
+                localFileSizeBytes = 0L
+            ) else it
         }
 
         AppAuditLogger.log(
             category = LogCategory.AI_INFERENCE,
             tag = "ModelManager",
-            message = "Download von '${targetModel?.name ?: modelId}' abgeschlossen und GGUF-Weights verifiziert",
-            details = "100% On-Device einsatzbereit. NPU/CPU-Beschleunigung aktiv."
+            message = "Modell-Datei vom Telefonspeicher gelöscht: ${destFile.name}",
+            details = "Erfolg: $deleted | Speicherplatz freigegeben."
         )
+        return deleted
     }
 
-    /**
-     * Führt eine lokale LLM-Klassifizierung des extrahierten OCR-Texts durch.
-     * Nutzt das vom Nutzer aktiv gewählte lokale HuggingFace Modell und extrahiert
-     * tiefgreifende semantische Metadaten sowie strukturierte Zusatzfelder.
-     */
+    suspend fun downloadModel(modelId: String, onProgress: (Float) -> Unit = {}) = withContext(Dispatchers.IO) {
+        val targetModel = _availableModels.value.find { it.id == modelId } ?: return@withContext
+        val destFile = getModelFile(modelId)
+        val tempFile = File(modelsDir, "${destFile.name}.part")
+
+        _availableModels.value = _availableModels.value.map {
+            if (it.id == modelId) it.copy(isDownloading = true, downloadProgress = 0f, downloadedBytes = 0L) else it
+        }
+
+        AppAuditLogger.log(
+            category = LogCategory.AI_INFERENCE,
+            tag = "ModelManager",
+            message = "Starte echten Download von '${targetModel.name}' von HuggingFace",
+            details = "URL: ${targetModel.downloadUrl} | Ziel: ${destFile.absolutePath}"
+        )
+
+        try {
+            val request = Request.Builder()
+                .url(targetModel.downloadUrl)
+                .header("User-Agent", "myDocAnizer-Mobile/1.1")
+                .build()
+
+            httpClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    throw IOException("HTTP-Fehler beim Modell-Download: ${response.code} ${response.message}")
+                }
+
+                val body = response.body ?: throw IOException("Leere Server-Antwort von HuggingFace")
+                val totalBytes = body.contentLength()
+                var bytesRead = 0L
+
+                tempFile.outputStream().use { output ->
+                    body.byteStream().use { input ->
+                        val buffer = ByteArray(64 * 1024)
+                        var read: Int
+                        var lastProgressUpdate = 0L
+
+                        while (input.read(buffer).also { read = it } != -1) {
+                            output.write(buffer, 0, read)
+                            bytesRead += read
+
+                            val now = System.currentTimeMillis()
+                            if (now - lastProgressUpdate > 250L || bytesRead == totalBytes) {
+                                lastProgressUpdate = now
+                                val progress = if (totalBytes > 0) (bytesRead.toFloat() / totalBytes).coerceIn(0f, 1f) else 0.5f
+                                onProgress(progress)
+
+                                _availableModels.value = _availableModels.value.map {
+                                    if (it.id == modelId) it.copy(
+                                        downloadProgress = progress,
+                                        downloadedBytes = bytesRead,
+                                        totalBytes = totalBytes
+                                    ) else it
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Verify file header: GGUF magic bytes (0x47, 0x47, 0x55, 0x46)
+                if (tempFile.length() >= 4) {
+                    val header = ByteArray(4)
+                    tempFile.inputStream().use { it.read(header) }
+                    val isGguf = header[0] == 0x47.toByte() && header[1] == 0x47.toByte() &&
+                                 header[2] == 0x55.toByte() && header[3] == 0x46.toByte()
+                    AppAuditLogger.log(
+                        category = LogCategory.AI_INFERENCE,
+                        tag = "ModelManager",
+                        message = if (isGguf) "GGUF-Signatur erfolgreich verifiziert" else "Warnung: Datei hat keine GGUF-Signatur",
+                        details = "Größe: ${tempFile.length()} Bytes (${tempFile.length() / (1024 * 1024)} MB)"
+                    )
+                }
+
+                if (destFile.exists()) destFile.delete()
+                tempFile.renameTo(destFile)
+
+                _availableModels.value = _availableModels.value.map {
+                    if (it.id == modelId) it.copy(
+                        isDownloading = false,
+                        isDownloaded = true,
+                        downloadProgress = 1.0f,
+                        localFileSizeBytes = destFile.length()
+                    ) else it
+                }
+
+                AppAuditLogger.log(
+                    category = LogCategory.AI_INFERENCE,
+                    tag = "ModelManager",
+                    message = "Download von '${targetModel.name}' erfolgreich abgeschlossen",
+                    details = "Gespeichert auf Gerät: ${destFile.absolutePath} (${destFile.length() / (1024 * 1024)} MB)"
+                )
+            }
+        } catch (e: Exception) {
+            tempFile.delete()
+            _availableModels.value = _availableModels.value.map {
+                if (it.id == modelId) it.copy(isDownloading = false, downloadProgress = 0f) else it
+            }
+            AppAuditLogger.log(
+                category = LogCategory.AI_INFERENCE,
+                tag = "ModelManager",
+                message = "Fehler beim Modell-Download von HuggingFace: ${e.message}",
+                details = e.stackTraceToString().take(300)
+            )
+            throw e
+        }
+    }
+
     suspend fun classifyDocumentText(
         ocrText: String,
         config: LlmInferenceConfig = LlmInferenceConfig()

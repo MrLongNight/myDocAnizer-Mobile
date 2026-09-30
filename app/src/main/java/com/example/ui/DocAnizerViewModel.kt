@@ -486,6 +486,9 @@ class DocAnizerViewModel(application: Application) : AndroidViewModel(applicatio
     fun downloadModel(modelId: String, onProgress: (Float) -> Unit = {}) {
         viewModelScope.launch { llmService.downloadModel(modelId, onProgress) }
     }
+    fun deleteModel(modelId: String) {
+        llmService.deleteModel(modelId)
+    }
     fun refreshHardwareInfo() = llmService.refreshHardwareInfo()
     fun updateLlmInferenceConfig(config: com.example.model.LlmInferenceConfig) = settingsRepo.updateLlmInferenceConfig(config)
     fun setLlmTemperature(temp: Float) = updateLlmInferenceConfig(llmInferenceConfig.value.copy(temperature = temp))
