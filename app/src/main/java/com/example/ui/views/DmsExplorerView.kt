@@ -28,6 +28,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.model.DocTypeItem
 import com.example.model.DocumentEntity
 import com.example.ui.DocAnizerViewModel
@@ -43,7 +44,8 @@ enum class ActiveFilterSheet {
     DOC_TYPE,
     PAGE_COUNT,
     DATE_RANGE,
-    SORT
+    SORT,
+    CUSTOM_FIELD
 }
 
 /**
@@ -60,36 +62,38 @@ fun DmsExplorerView(
     modifier: Modifier = Modifier,
     onNavigateToImport: () -> Unit = {}
 ) {
-    val documents by viewModel.filteredDocuments.collectAsState()
-    val allDocs by viewModel.allDocuments.collectAsState()
-    val templates by viewModel.templates.collectAsState()
-    val searchQuery by viewModel.searchQuery.collectAsState()
-    val storageUsage by viewModel.storageUsage.collectAsState()
-    val pdfSettings by viewModel.pdfSettings.collectAsState()
+    val documents by viewModel.filteredDocuments.collectAsStateWithLifecycle()
+    val allDocs by viewModel.allDocuments.collectAsStateWithLifecycle()
+    val templates by viewModel.templates.collectAsStateWithLifecycle()
+    val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
+    val storageUsage by viewModel.storageUsage.collectAsStateWithLifecycle()
+    val pdfSettings by viewModel.pdfSettings.collectAsStateWithLifecycle()
     var isStorageOverviewExpanded by remember { mutableStateOf(false) }
-    val filterDocType by viewModel.filterDocType.collectAsState()
-    val filterMainCategory by viewModel.filterMainCategory.collectAsState()
-    val filterSubCategory by viewModel.filterSubCategory.collectAsState()
-    val filterDateRange by viewModel.filterDateRange.collectAsState()
-    val filterPageFilter by viewModel.filterPageFilter.collectAsState()
-    val filterSortBy by viewModel.filterSortBy.collectAsState()
-    val activeFilterCount by viewModel.activeFilterCount.collectAsState()
-    val docTypes by viewModel.docTypes.collectAsState()
+    val filterDocType by viewModel.filterDocType.collectAsStateWithLifecycle()
+    val filterMainCategory by viewModel.filterMainCategory.collectAsStateWithLifecycle()
+    val filterSubCategory by viewModel.filterSubCategory.collectAsStateWithLifecycle()
+    val filterDateRange by viewModel.filterDateRange.collectAsStateWithLifecycle()
+    val filterPageFilter by viewModel.filterPageFilter.collectAsStateWithLifecycle()
+    val filterSortBy by viewModel.filterSortBy.collectAsStateWithLifecycle()
+    val filterCustomFieldId by viewModel.filterCustomFieldId.collectAsStateWithLifecycle()
+    val filterCustomFieldValue by viewModel.filterCustomFieldValue.collectAsStateWithLifecycle()
+    val activeFilterCount by viewModel.activeFilterCount.collectAsStateWithLifecycle()
+    val docTypes by viewModel.docTypes.collectAsStateWithLifecycle()
 
     // Papierkorb, Fristen & Kalender, KI-Chat & Zusatzfelder
-    val trashDocs by viewModel.trashDocuments.collectAsState()
-    val trashCount by viewModel.trashCount.collectAsState()
-    val contractDeadlines by viewModel.contractDeadlines.collectAsState()
-    val trashRetentionDays by viewModel.trashRetentionDays.collectAsState()
-    val calendarIntegrationMode by viewModel.calendarIntegrationMode.collectAsState()
-    val chatMessages by viewModel.chatMessages.collectAsState()
+    val trashDocs by viewModel.trashDocuments.collectAsStateWithLifecycle()
+    val trashCount by viewModel.trashCount.collectAsStateWithLifecycle()
+    val contractDeadlines by viewModel.contractDeadlines.collectAsStateWithLifecycle()
+    val trashRetentionDays by viewModel.trashRetentionDays.collectAsStateWithLifecycle()
+    val calendarIntegrationMode by viewModel.calendarIntegrationMode.collectAsStateWithLifecycle()
+    val chatMessages by viewModel.chatMessages.collectAsStateWithLifecycle()
 
-    val customFields by viewModel.customFields.collectAsState()
-    val allCustomFieldValues by viewModel.allDocumentCustomFieldValues.collectAsState()
+    val customFields by viewModel.customFields.collectAsStateWithLifecycle()
+    val allCustomFieldValues by viewModel.allDocumentCustomFieldValues.collectAsStateWithLifecycle()
     var showCreateCustomFieldDialog by remember { mutableStateOf(false) }
     var fieldToEdit by remember { mutableStateOf<com.example.model.CustomFieldEntity?>(null) }
 
-    var activeSubTab by remember { mutableStateOf(0) } // 0: Ordner, 1: Gruppen, 2: Fristen & Kalender, 3: Papierkorb
+    var activeSubTab by remember { mutableStateOf(0) } // 0: Ordner, 1: Fristen & Kalender, 2: Papierkorb
     var selectedDocumentForDetail by remember { mutableStateOf<DocumentEntity?>(null) }
     var showAiChatDialog by remember { mutableStateOf(false) }
 
@@ -362,6 +366,29 @@ fun DmsExplorerView(
                         }
                     }
 
+                    // 6. Zusatzfeld Filter Chip
+                    if (filterCustomFieldId != null) {
+                        val activeField = customFields.firstOrNull { it.id == filterCustomFieldId }
+                        val label = "${activeField?.name ?: "Zusatzfeld"}${if (!filterCustomFieldValue.isNullOrBlank()) ": $filterCustomFieldValue" else ""}"
+                        item {
+                            InputChip(
+                                selected = true,
+                                onClick = { currentFilterSheet = ActiveFilterSheet.CUSTOM_FIELD },
+                                label = { Text("📋 $label") },
+                                trailingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "Entfernen",
+                                        modifier = Modifier
+                                            .size(14.dp)
+                                            .clickable { viewModel.setFilterCustomField(null, null) }
+                                    )
+                                },
+                                shape = RoundedCornerShape(16.dp)
+                            )
+                        }
+                    }
+
                     // Alle zurücksetzen
                     if (activeFilterCount > 0) {
                         item {
@@ -378,54 +405,74 @@ fun DmsExplorerView(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Sub-Reiter: Ordner, Gruppen, Fristen & Kalender, Papierkorb
-                ScrollableTabRow(
+                // Sub-Reiter: Ordner, Fristen, Papierkorb (3 Tabs fest nebeneinander)
+                TabRow(
                     selectedTabIndex = activeSubTab,
                     containerColor = MaterialTheme.colorScheme.surface,
-                    edgePadding = 12.dp,
-                    modifier = Modifier.fillMaxWidth()
+                    contentColor = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.fillMaxWidth().testTag("dms_explorer_tab_row")
                 ) {
                     Tab(
                         selected = activeSubTab == 0,
                         onClick = { activeSubTab = 0 },
-                        text = { Text("Ordner") },
-                        icon = { Icon(Icons.Default.Folder, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                        text = {
+                            Text(
+                                text = "Ordner",
+                                maxLines = 1,
+                                fontSize = 12.sp,
+                                fontWeight = if (activeSubTab == 0) FontWeight.Bold else FontWeight.Medium
+                            )
+                        },
+                        icon = { Icon(Icons.Default.Folder, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                        modifier = Modifier.testTag("tab_dms_folders")
                     )
                     Tab(
                         selected = activeSubTab == 1,
                         onClick = { activeSubTab = 1 },
-                        text = { Text("Zusatzfelder") },
-                        icon = { Icon(Icons.Default.Tune, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                        text = {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(3.dp)
+                            ) {
+                                Text(
+                                    text = "Fristen",
+                                    maxLines = 1,
+                                    fontSize = 12.sp,
+                                    fontWeight = if (activeSubTab == 1) FontWeight.Bold else FontWeight.Medium
+                                )
+                                if (contractDeadlines.isNotEmpty()) {
+                                    Badge(containerColor = MaterialTheme.colorScheme.primary) {
+                                        Text("${contractDeadlines.size}", fontSize = 9.sp)
+                                    }
+                                }
+                            }
+                        },
+                        icon = { Icon(Icons.Default.Event, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                        modifier = Modifier.testTag("tab_dms_deadlines")
                     )
                     Tab(
                         selected = activeSubTab == 2,
                         onClick = { activeSubTab = 2 },
                         text = {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Text("Fristen & Kalender")
-                                if (contractDeadlines.isNotEmpty()) {
-                                    Badge(containerColor = MaterialTheme.colorScheme.primary) {
-                                        Text("${contractDeadlines.size}")
-                                    }
-                                }
-                            }
-                        },
-                        icon = { Icon(Icons.Default.Event, contentDescription = null, modifier = Modifier.size(18.dp)) }
-                    )
-                    Tab(
-                        selected = activeSubTab == 3,
-                        onClick = { activeSubTab = 3 },
-                        text = {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Text("Papierkorb")
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(3.dp)
+                            ) {
+                                Text(
+                                    text = "Papierkorb",
+                                    maxLines = 1,
+                                    fontSize = 12.sp,
+                                    fontWeight = if (activeSubTab == 2) FontWeight.Bold else FontWeight.Medium
+                                )
                                 if (trashCount > 0) {
                                     Badge(containerColor = MaterialTheme.colorScheme.error) {
-                                        Text("$trashCount", color = MaterialTheme.colorScheme.onError)
+                                        Text("$trashCount", color = MaterialTheme.colorScheme.onError, fontSize = 9.sp)
                                     }
                                 }
                             }
                         },
-                        icon = { Icon(Icons.Default.DeleteSweep, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                        icon = { Icon(Icons.Default.DeleteSweep, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                        modifier = Modifier.testTag("tab_dms_trash")
                     )
                 }
 
@@ -944,27 +991,15 @@ fun DmsExplorerView(
                 }
             }
         } else if (activeSubTab == 1) {
-            // 2. VORDEFINIERTE & GLOBALE ZUSATZFELDER
-            CustomFieldsManagementTab(
-                customFields = customFields,
-                customFieldValues = allCustomFieldValues,
-                documents = allDocs,
-                availableMainCategories = availableMainCategories,
-                onAddFieldClick = { showCreateCustomFieldDialog = true },
-                onEditField = { fieldToEdit = it },
-                onDeleteField = { viewModel.deleteCustomField(it) },
-                onSelectDocument = { selectedDocumentForDetail = it }
-            )
-        } else if (activeSubTab == 2) {
-            // 3. FRISTEN- & KALENDER-ZENTRALE
+            // 2. FRISTEN- & KALENDER-ZENTRALE
             CalendarAndDeadlinesTab(
                 documentsWithDeadlines = contractDeadlines,
                 calendarIntegrationMode = calendarIntegrationMode,
                 onSelectDocument = { selectedDocumentForDetail = it },
                 onSetCalendarMode = { viewModel.setCalendarIntegrationMode(it) }
             )
-        } else if (activeSubTab == 3) {
-            // 4. MÜLLEIMER / PAPIERKORB
+        } else if (activeSubTab == 2) {
+            // 3. MÜLLEIMER / PAPIERKORB
             TrashRecycleBinTab(
                 trashDocuments = trashDocs,
                 trashRetentionDays = trashRetentionDays,
@@ -1072,6 +1107,16 @@ fun DmsExplorerView(
                     },
                     isActive = filterSortBy != "DATE_DESC",
                     onClick = { currentFilterSheet = ActiveFilterSheet.SORT }
+                )
+
+                // 6. Zusatzfelder
+                val activeCustomField = customFields.firstOrNull { it.id == filterCustomFieldId }
+                FilterCategoryTile(
+                    icon = Icons.Default.Category,
+                    title = "Zusatzfeld-Filter",
+                    currentValue = if (activeCustomField != null) "${activeCustomField.name}${if (!filterCustomFieldValue.isNullOrBlank()) ": $filterCustomFieldValue" else ""}" else "Alle Zusatzfelder",
+                    isActive = filterCustomFieldId != null,
+                    onClick = { currentFilterSheet = ActiveFilterSheet.CUSTOM_FIELD }
                 )
 
                 Spacer(modifier = Modifier.height(24.dp))
@@ -1292,6 +1337,108 @@ fun DmsExplorerView(
             confirmButton = {
                 TextButton(onClick = { currentFilterSheet = ActiveFilterSheet.NONE }) {
                     Text("Fertig")
+                }
+            }
+        )
+    }
+
+    // SPEZIFISCHER FILTER-DIALOG: ZUSATZFELDER
+    if (currentFilterSheet == ActiveFilterSheet.CUSTOM_FIELD) {
+        var selectedFieldForFilter by remember { mutableStateOf<com.example.model.CustomFieldEntity?>(customFields.firstOrNull { it.id == filterCustomFieldId } ?: customFields.firstOrNull()) }
+        var filterValueInput by remember { mutableStateOf(filterCustomFieldValue ?: "") }
+
+        AlertDialog(
+            onDismissRequest = { currentFilterSheet = ActiveFilterSheet.NONE },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(Icons.Default.Category, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Text("Zusatzfeld-Filter")
+                }
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text("Wähle ein Zusatzfeld aus, nach dem gefiltert werden soll:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+                    if (customFields.isEmpty()) {
+                        Text("Keine Zusatzfelder vorhanden. Diese können in den Einstellungen angelegt oder automatisch per KI erkannt werden.", style = MaterialTheme.typography.bodySmall)
+                    } else {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            customFields.forEach { field ->
+                                val isSelected = selectedFieldForFilter?.id == field.id
+                                Surface(
+                                    onClick = { selectedFieldForFilter = field },
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                    border = if (isSelected) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(10.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(field.name, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal)
+                                        Text(field.type.label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                }
+                            }
+                        }
+
+                        selectedFieldForFilter?.let { field ->
+                            HorizontalDivider()
+                            Text("Wert filtern (optional):", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+
+                            if (field.type == com.example.model.CustomFieldType.SELECTION && field.options.isNotBlank()) {
+                                val opts = field.options.split(",").map { it.trim() }.filter { it.isNotBlank() }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    opts.forEach { opt ->
+                                        val isChosen = filterValueInput == opt
+                                        FilterChip(
+                                            selected = isChosen,
+                                            onClick = { filterValueInput = if (isChosen) "" else opt },
+                                            label = { Text(opt, fontSize = 11.sp) }
+                                        )
+                                    }
+                                }
+                            } else {
+                                OutlinedTextField(
+                                    value = filterValueInput,
+                                    onValueChange = { filterValueInput = it },
+                                    label = { Text("Filterwert (leer = alle mit diesem Feld)") },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            dismissButton = {
+                if (filterCustomFieldId != null) {
+                    TextButton(onClick = {
+                        viewModel.setFilterCustomField(null, null)
+                        currentFilterSheet = ActiveFilterSheet.NONE
+                    }) {
+                        Text("Filter löschen", color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            },
+            confirmButton = {
+                Button(onClick = {
+                    selectedFieldForFilter?.let { field ->
+                        viewModel.setFilterCustomField(field.id, filterValueInput.ifBlank { null })
+                    }
+                    currentFilterSheet = ActiveFilterSheet.NONE
+                }) {
+                    Text("Anwenden")
                 }
             }
         )

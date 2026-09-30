@@ -8,6 +8,7 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.model.BankStatementEntryEntity
 import com.example.model.CashTransactionEntity
+import com.example.model.CustomDashboardWidgetEntity
 import com.example.model.CustomFieldEntity
 import com.example.model.DocumentCustomFieldValueEntity
 import com.example.model.DocumentEntity
@@ -18,15 +19,17 @@ import com.example.model.DocumentEntity
         CustomFieldEntity::class,
         DocumentCustomFieldValueEntity::class,
         CashTransactionEntity::class,
-        BankStatementEntryEntity::class
+        BankStatementEntryEntity::class,
+        CustomDashboardWidgetEntity::class
     ],
-    version = 6,
+    version = 8,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun documentDao(): DocumentDao
     abstract fun customFieldDao(): CustomFieldDao
     abstract fun financeDao(): FinanceDao
+    abstract fun customDashboardWidgetDao(): CustomDashboardWidgetDao
 
     companion object {
         @Volatile
@@ -114,6 +117,41 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `custom_dashboard_widgets` (
+                        `id` TEXT NOT NULL,
+                        `title` TEXT NOT NULL,
+                        `subtitle` TEXT NOT NULL,
+                        `widgetType` TEXT NOT NULL,
+                        `targetMainCategory` TEXT NOT NULL,
+                        `targetSubCategory` TEXT NOT NULL,
+                        `targetCustomFieldId` TEXT NOT NULL,
+                        `targetCustomFieldValue` TEXT NOT NULL,
+                        `numericLimit` REAL NOT NULL,
+                        `noteContent` TEXT NOT NULL,
+                        `colorHex` INTEGER NOT NULL,
+                        `iconName` TEXT NOT NULL,
+                        `isEnabled` INTEGER NOT NULL,
+                        `position` INTEGER NOT NULL,
+                        `createdAt` INTEGER NOT NULL,
+                        PRIMARY KEY(`id`)
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_custom_dashboard_widgets_position` ON `custom_dashboard_widgets` (`position`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_custom_dashboard_widgets_widgetType` ON `custom_dashboard_widgets` (`widgetType`)")
+            }
+        }
+
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `documents` ADD COLUMN `customIcon` TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE `documents` ADD COLUMN `companyLogo` TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE `custom_fields` ADD COLUMN `iconName` TEXT NOT NULL DEFAULT 'label'")
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -121,7 +159,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "mydocanizer_database"
                 )
-                    .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                    .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
                     .fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = instance

@@ -44,6 +44,31 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Homescreen Widgets -->
+        <receiver
+            android:name="com.example.widget.BelegQuickScanWidget"
+            android:exported="true"
+            android:label="Beleg Quick-Scan">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/beleg_quick_scan_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name="com.example.widget.BargeldTrackerWidget"
+            android:exported="true"
+            android:label="Bargeld-Tracker">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/bargeld_tracker_widget_info" />
+        </receiver>
     </application>
 
 </manifest>

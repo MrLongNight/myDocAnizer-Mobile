@@ -469,7 +469,11 @@ class P2pSyncServer(
         val finalBytes = if (isEncrypted) {
             val pin = _hostPairingPin.value ?: ""
             val key = P2pSyncSecurityService.deriveKeyFromPin(pin)
-            val decrypted = P2pSyncSecurityService.decryptBytes(rawBytes, key)
+            val decrypted = try {
+                P2pSyncSecurityService.decryptBytes(rawBytes, key)
+            } finally {
+                key.fill(0)
+            }
             if (decrypted == null) {
                 return sendJsonResponse(output, 400, JSONObject().put("error", "Entschlüsselung fehlgeschlagen (Falscher WebCrypto-Key/PIN)").toString())
             }
@@ -538,7 +542,11 @@ class P2pSyncServer(
         val finalBytes = if (isEncrypted) {
             val pin = _hostPairingPin.value ?: ""
             val key = P2pSyncSecurityService.deriveKeyFromPin(pin)
-            val decrypted = P2pSyncSecurityService.decryptBytes(rawBytes, key)
+            val decrypted = try {
+                P2pSyncSecurityService.decryptBytes(rawBytes, key)
+            } finally {
+                key.fill(0)
+            }
             decrypted ?: rawBytes
         } else {
             rawBytes

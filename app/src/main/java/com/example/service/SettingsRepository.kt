@@ -3,10 +3,14 @@ package com.example.service
 import android.content.Context
 import android.content.SharedPreferences
 import com.example.model.AppViewLevel
+import com.example.model.ChecklistItem
+import com.example.model.CustomDashboardWidget
 import com.example.model.DocTypeItem
+import com.example.model.ElementPeriodScope
 import com.example.model.ImportTemplateItem
 import com.example.model.PRESET_IMPORT_TEMPLATES
 import com.example.model.PdfSettings
+import com.example.model.STANDARD_DASHBOARD_TEMPLATES
 import com.example.model.ScannerSettings
 import com.example.model.TemplateItem
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -64,23 +68,14 @@ class SettingsRepository(context: Context) {
         _enableBankStatementImport.value = enabled
     }
 
-    // Automatischer monatlicher Datenabgleich (Reconciliation / Kassenprüfung)
-    // Gleicht Bargeld-Abhebungen vom Konto mit manuellen Bar-Ausgaben ab (für Steuerberater & lückenlose Belege)
+    // Automatischer monatlicher Datenabgleich (Bargeld- & Beleg-Check / Selbstkontrolle)
+    // Gleicht Bargeld-Abhebungen vom Konto mit manuellen Bar-Ausgaben und Belegen ab
     private val _enableMonthlyReconciliation = MutableStateFlow(prefs.getBoolean("enable_monthly_reconciliation", false))
     val enableMonthlyReconciliation: StateFlow<Boolean> = _enableMonthlyReconciliation.asStateFlow()
 
     fun setEnableMonthlyReconciliation(enabled: Boolean) {
         prefs.edit().putBoolean("enable_monthly_reconciliation", enabled).apply()
         _enableMonthlyReconciliation.value = enabled
-    }
-
-    // Zusätzliche Optionen für den Monatsabgleich
-    private val _reconciliationToleranceDays = MutableStateFlow(prefs.getInt("reconciliation_tolerance_days", 5))
-    val reconciliationToleranceDays: StateFlow<Int> = _reconciliationToleranceDays.asStateFlow()
-
-    fun setReconciliationToleranceDays(days: Int) {
-        prefs.edit().putInt("reconciliation_tolerance_days", days).apply()
-        _reconciliationToleranceDays.value = days
     }
 
     private val _notifyReconciliationDiscrepancies = MutableStateFlow(prefs.getBoolean("notify_reconciliation_discrepancies", true))
@@ -91,47 +86,309 @@ class SettingsRepository(context: Context) {
         _notifyReconciliationDiscrepancies.value = enabled
     }
 
-    // Dashboard anpassbare Widgets
-    private val _showKpiWidgets = MutableStateFlow(prefs.getBoolean("dashboard_show_kpi", true))
+    // Dashboard anpassbare Widgets (Standardmäßig nur Grundfunktionen ohne Aktivierungsaufwand)
+    private val _showBelegQuickScanWidget = MutableStateFlow(prefs.getBoolean("dashboard_show_quick_scan", false))
+    val showBelegQuickScanWidget: StateFlow<Boolean> = _showBelegQuickScanWidget.asStateFlow()
+    fun setShowBelegQuickScanWidget(show: Boolean) {
+        prefs.edit().putBoolean("dashboard_show_quick_scan", show).apply()
+        _showBelegQuickScanWidget.value = show
+    }
+
+    private val _showCashTrackerWidget = MutableStateFlow(prefs.getBoolean("dashboard_show_cash_tracker", false))
+    val showCashTrackerWidget: StateFlow<Boolean> = _showCashTrackerWidget.asStateFlow()
+    fun setShowCashTrackerWidget(show: Boolean) {
+        prefs.edit().putBoolean("dashboard_show_cash_tracker", show).apply()
+        _showCashTrackerWidget.value = show
+    }
+
+    private val _showKpiWidgets = MutableStateFlow(prefs.getBoolean("dashboard_show_kpi", false))
     val showKpiWidgets: StateFlow<Boolean> = _showKpiWidgets.asStateFlow()
     fun setShowKpiWidgets(show: Boolean) {
         prefs.edit().putBoolean("dashboard_show_kpi", show).apply()
         _showKpiWidgets.value = show
     }
 
-    private val _showDeadlinesWidget = MutableStateFlow(prefs.getBoolean("dashboard_show_deadlines", true))
+    private val _showDeadlinesWidget = MutableStateFlow(prefs.getBoolean("dashboard_show_deadlines", false))
     val showDeadlinesWidget: StateFlow<Boolean> = _showDeadlinesWidget.asStateFlow()
     fun setShowDeadlinesWidget(show: Boolean) {
         prefs.edit().putBoolean("dashboard_show_deadlines", show).apply()
         _showDeadlinesWidget.value = show
     }
 
-    private val _showFinanceWidget = MutableStateFlow(prefs.getBoolean("dashboard_show_finance", true))
+    private val _showFinanceWidget = MutableStateFlow(prefs.getBoolean("dashboard_show_finance", false))
     val showFinanceWidget: StateFlow<Boolean> = _showFinanceWidget.asStateFlow()
     fun setShowFinanceWidget(show: Boolean) {
         prefs.edit().putBoolean("dashboard_show_finance", show).apply()
         _showFinanceWidget.value = show
     }
 
-    private val _showReconciliationWidget = MutableStateFlow(prefs.getBoolean("dashboard_show_reconciliation", true))
+    private val _showReconciliationWidget = MutableStateFlow(prefs.getBoolean("dashboard_show_reconciliation", false))
     val showReconciliationWidget: StateFlow<Boolean> = _showReconciliationWidget.asStateFlow()
     fun setShowReconciliationWidget(show: Boolean) {
         prefs.edit().putBoolean("dashboard_show_reconciliation", show).apply()
         _showReconciliationWidget.value = show
     }
 
-    private val _showCategoryDistributionWidget = MutableStateFlow(prefs.getBoolean("dashboard_show_category_distribution", true))
+    private val _showCategoryDistributionWidget = MutableStateFlow(prefs.getBoolean("dashboard_show_category_distribution", false))
     val showCategoryDistributionWidget: StateFlow<Boolean> = _showCategoryDistributionWidget.asStateFlow()
     fun setShowCategoryDistributionWidget(show: Boolean) {
         prefs.edit().putBoolean("dashboard_show_category_distribution", show).apply()
         _showCategoryDistributionWidget.value = show
     }
 
-    private val _showSecurityScoreWidget = MutableStateFlow(prefs.getBoolean("dashboard_show_security_score", true))
+    private val _showSecurityScoreWidget = MutableStateFlow(prefs.getBoolean("dashboard_show_security_score", false))
     val showSecurityScoreWidget: StateFlow<Boolean> = _showSecurityScoreWidget.asStateFlow()
     fun setShowSecurityScoreWidget(show: Boolean) {
         prefs.edit().putBoolean("dashboard_show_security_score", show).apply()
         _showSecurityScoreWidget.value = show
+    }
+
+    private val _showCustomFieldsWidget = MutableStateFlow(prefs.getBoolean("dashboard_show_custom_fields", false))
+    val showCustomFieldsWidget: StateFlow<Boolean> = _showCustomFieldsWidget.asStateFlow()
+    fun setShowCustomFieldsWidget(show: Boolean) {
+        prefs.edit().putBoolean("dashboard_show_custom_fields", show).apply()
+        _showCustomFieldsWidget.value = show
+    }
+
+    // Zusätzliche Standard-Vorlagen Sichtbarkeiten
+    private val _showRecentDocsWidget = MutableStateFlow(prefs.getBoolean("dashboard_show_recent_docs", true))
+    val showRecentDocsWidget: StateFlow<Boolean> = _showRecentDocsWidget.asStateFlow()
+    fun setShowRecentDocsWidget(show: Boolean) {
+        prefs.edit().putBoolean("dashboard_show_recent_docs", show).apply()
+        _showRecentDocsWidget.value = show
+    }
+
+    private val _showFolderShortcutsWidget = MutableStateFlow(prefs.getBoolean("dashboard_show_folder_shortcuts", false))
+    val showFolderShortcutsWidget: StateFlow<Boolean> = _showFolderShortcutsWidget.asStateFlow()
+    fun setShowFolderShortcutsWidget(show: Boolean) {
+        prefs.edit().putBoolean("dashboard_show_folder_shortcuts", show).apply()
+        _showFolderShortcutsWidget.value = show
+    }
+
+    private val _showInboxDocsWidget = MutableStateFlow(prefs.getBoolean("dashboard_show_inbox_docs", false))
+    val showInboxDocsWidget: StateFlow<Boolean> = _showInboxDocsWidget.asStateFlow()
+    fun setShowInboxDocsWidget(show: Boolean) {
+        prefs.edit().putBoolean("dashboard_show_inbox_docs", show).apply()
+        _showInboxDocsWidget.value = show
+    }
+
+    private val _showBudgetWatchWidget = MutableStateFlow(prefs.getBoolean("dashboard_show_budget_watch", false))
+    val showBudgetWatchWidget: StateFlow<Boolean> = _showBudgetWatchWidget.asStateFlow()
+    fun setShowBudgetWatchWidget(show: Boolean) {
+        prefs.edit().putBoolean("dashboard_show_budget_watch", show).apply()
+        _showBudgetWatchWidget.value = show
+    }
+
+    private val _showQuickActionsWidget = MutableStateFlow(prefs.getBoolean("dashboard_show_quick_actions", true))
+    val showQuickActionsWidget: StateFlow<Boolean> = _showQuickActionsWidget.asStateFlow()
+    fun setShowQuickActionsWidget(show: Boolean) {
+        prefs.edit().putBoolean("dashboard_show_quick_actions", show).apply()
+        _showQuickActionsWidget.value = show
+    }
+
+    private val _showQuickNoteWidget = MutableStateFlow(prefs.getBoolean("dashboard_show_quick_note", false))
+    val showQuickNoteWidget: StateFlow<Boolean> = _showQuickNoteWidget.asStateFlow()
+    fun setShowQuickNoteWidget(show: Boolean) {
+        prefs.edit().putBoolean("dashboard_show_quick_note", show).apply()
+        _showQuickNoteWidget.value = show
+    }
+
+    private val _quickNoteText = MutableStateFlow(prefs.getString("dashboard_quick_note_text", "") ?: "")
+    val quickNoteText: StateFlow<String> = _quickNoteText.asStateFlow()
+    fun setQuickNoteText(text: String) {
+        prefs.edit().putString("dashboard_quick_note_text", text).apply()
+        _quickNoteText.value = text
+    }
+
+    // Individuelle, vom Nutzer erstellte Dashboard-Elemente (Custom Dashboard Widgets)
+    private val _customDashboardWidgets = MutableStateFlow<List<CustomDashboardWidget>>(loadCustomDashboardWidgets())
+    val customDashboardWidgets: StateFlow<List<CustomDashboardWidget>> = _customDashboardWidgets.asStateFlow()
+
+    private fun loadCustomDashboardWidgets(): List<CustomDashboardWidget> {
+        val jsonStr = prefs.getString("custom_dashboard_widgets_json", null) ?: return emptyList()
+        return try {
+            val array = JSONArray(jsonStr)
+            val list = mutableListOf<CustomDashboardWidget>()
+            for (i in 0 until array.length()) {
+                val obj = array.optJSONObject(i)
+                if (obj != null) {
+                    list.add(CustomDashboardWidget.fromJson(obj))
+                }
+            }
+            list
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    private fun saveCustomDashboardWidgets(list: List<CustomDashboardWidget>) {
+        val array = JSONArray()
+        list.forEach { array.put(it.toJson()) }
+        prefs.edit().putString("custom_dashboard_widgets_json", array.toString()).apply()
+        _customDashboardWidgets.value = list
+    }
+
+    fun addCustomWidget(widget: CustomDashboardWidget) {
+        val current = _customDashboardWidgets.value.toMutableList()
+        current.add(widget)
+        saveCustomDashboardWidgets(current)
+
+        // Automatisch an die Widget-Reihenfolge anhängen
+        val order = _dashboardWidgetOrder.value.toMutableList()
+        if (!order.contains(widget.id)) {
+            order.add(widget.id)
+            setDashboardWidgetOrder(order)
+        }
+    }
+
+    fun updateCustomWidget(widget: CustomDashboardWidget) {
+        val current = _customDashboardWidgets.value.toMutableList()
+        val index = current.indexOfFirst { it.id == widget.id }
+        if (index != -1) {
+            current[index] = widget
+            saveCustomDashboardWidgets(current)
+        }
+    }
+
+    fun deleteCustomWidget(id: String) {
+        val current = _customDashboardWidgets.value.filter { it.id != id }
+        saveCustomDashboardWidgets(current)
+
+        val order = _dashboardWidgetOrder.value.filter { it != id }
+        setDashboardWidgetOrder(order)
+    }
+
+    fun toggleCustomWidget(id: String, enabled: Boolean) {
+        val current = _customDashboardWidgets.value.toMutableList()
+        val index = current.indexOfFirst { it.id == id }
+        if (index != -1) {
+            current[index] = current[index].copy(isEnabled = enabled)
+            saveCustomDashboardWidgets(current)
+        }
+    }
+
+    fun updateCustomWidgetChecklist(id: String, items: List<ChecklistItem>) {
+        val current = _customDashboardWidgets.value.toMutableList()
+        val index = current.indexOfFirst { it.id == id }
+        if (index != -1) {
+            current[index] = current[index].copy(checklistItems = items)
+            saveCustomDashboardWidgets(current)
+        }
+    }
+
+    fun updateCustomWidgetNote(id: String, text: String) {
+        val current = _customDashboardWidgets.value.toMutableList()
+        val index = current.indexOfFirst { it.id == id }
+        if (index != -1) {
+            current[index] = current[index].copy(noteText = text)
+            saveCustomDashboardWidgets(current)
+        }
+    }
+
+    // Dashboard-Element Reihenfolge & Sortierung (Drag & Drop / Reordering)
+    private val DEFAULT_WIDGET_ORDER = listOf(
+        "STANDARD_QUICK_ACTIONS",
+        "STANDARD_RECENT_DOCS",
+        "STANDARD_KPI",
+        "STANDARD_DEADLINES_RADAR",
+        "STANDARD_FINANCE_CHART",
+        "STANDARD_SECURITY_SCORE",
+        "STANDARD_QUICK_SCAN",
+        "STANDARD_CASH_TRACKER",
+        "STANDARD_RECONCILIATION",
+        "STANDARD_CATEGORY_PIE",
+        "STANDARD_CUSTOM_FIELDS",
+        "STANDARD_FOLDER_SHORTCUTS",
+        "STANDARD_INBOX_DOCS",
+        "STANDARD_BUDGET_WATCH",
+        "STANDARD_QUICK_NOTE"
+    )
+
+    private val _dashboardWidgetOrder = MutableStateFlow<List<String>>(loadDashboardWidgetOrder())
+    val dashboardWidgetOrder: StateFlow<List<String>> = _dashboardWidgetOrder.asStateFlow()
+
+    private fun loadDashboardWidgetOrder(): List<String> {
+        val str = prefs.getString("dashboard_widget_order_list", null)
+        if (str.isNullOrBlank()) {
+            return DEFAULT_WIDGET_ORDER
+        }
+        val savedList = str.split(",").filter { it.isNotBlank() }
+        // Ensure all default ones exist
+        val combined = savedList.toMutableList()
+        DEFAULT_WIDGET_ORDER.forEach { defId ->
+            if (!combined.contains(defId)) combined.add(defId)
+        }
+        return combined
+    }
+
+    fun setDashboardWidgetOrder(order: List<String>) {
+        prefs.edit().putString("dashboard_widget_order_list", order.joinToString(",")).apply()
+        _dashboardWidgetOrder.value = order
+    }
+
+    fun moveWidgetUp(widgetId: String) {
+        val current = _dashboardWidgetOrder.value.toMutableList()
+        val idx = current.indexOf(widgetId)
+        if (idx > 0) {
+            val temp = current[idx]
+            current[idx] = current[idx - 1]
+            current[idx - 1] = temp
+            setDashboardWidgetOrder(current)
+        }
+    }
+
+    fun moveWidgetDown(widgetId: String) {
+        val current = _dashboardWidgetOrder.value.toMutableList()
+        val idx = current.indexOf(widgetId)
+        if (idx != -1 && idx < current.size - 1) {
+            val temp = current[idx]
+            current[idx] = current[idx + 1]
+            current[idx + 1] = temp
+            setDashboardWidgetOrder(current)
+        }
+    }
+
+    fun resetWidgetOrder() {
+        setDashboardWidgetOrder(DEFAULT_WIDGET_ORDER)
+    }
+
+    // Element-spezifische Zeitraum-Scopes (Period Scopes pro Dashboard Element)
+    private val _elementPeriodScopes = MutableStateFlow<Map<String, ElementPeriodScope>>(loadElementPeriodScopes())
+    val elementPeriodScopes: StateFlow<Map<String, ElementPeriodScope>> = _elementPeriodScopes.asStateFlow()
+
+    private fun loadElementPeriodScopes(): Map<String, ElementPeriodScope> {
+        val map = mutableMapOf<String, ElementPeriodScope>()
+        val defaultMap = mapOf(
+            "STANDARD_KPI" to ElementPeriodScope.ALL,
+            "STANDARD_RECENT_DOCS" to ElementPeriodScope.ALL,
+            "STANDARD_FINANCE_CHART" to ElementPeriodScope.YEAR,
+            "STANDARD_CASH_TRACKER" to ElementPeriodScope.MONTH,
+            "STANDARD_RECONCILIATION" to ElementPeriodScope.MONTH,
+            "STANDARD_CATEGORY_PIE" to ElementPeriodScope.ALL,
+            "STANDARD_BUDGET_WATCH" to ElementPeriodScope.MONTH,
+            "STANDARD_DEADLINES_RADAR" to ElementPeriodScope.ALL,
+            "STANDARD_DEADLINES_MONTH" to ElementPeriodScope.LAST_30_DAYS,
+            "STANDARD_CUSTOM_FIELDS" to ElementPeriodScope.ALL
+        )
+        defaultMap.forEach { (id, defScope) ->
+            val savedStr = prefs.getString("element_period_scope_$id", null)
+            val scope = if (savedStr != null) {
+                try { ElementPeriodScope.valueOf(savedStr) } catch (e: Exception) { defScope }
+            } else defScope
+            map[id] = scope
+        }
+        return map
+    }
+
+    fun getElementPeriodScope(elementId: String, defaultScope: ElementPeriodScope = ElementPeriodScope.ALL): ElementPeriodScope {
+        return _elementPeriodScopes.value[elementId] ?: defaultScope
+    }
+
+    fun setElementPeriodScope(elementId: String, scope: ElementPeriodScope) {
+        prefs.edit().putString("element_period_scope_$elementId", scope.name).apply()
+        val current = _elementPeriodScopes.value.toMutableMap()
+        current[elementId] = scope
+        _elementPeriodScopes.value = current
     }
 
     // Dark / Light Theme Einstellung: "SYSTEM", "DARK", "LIGHT"
@@ -366,7 +623,10 @@ class SettingsRepository(context: Context) {
                             com.example.model.FolderSubCategoryItem(
                                 id = subObj.optString("id", UUID.randomUUID().toString()),
                                 name = subObj.getString("name"),
-                                prefixId = subObj.optString("prefixId", "")
+                                prefixId = subObj.optString("prefixId", ""),
+                                iconName = subObj.optString("iconName", ""),
+                                companyLogo = subObj.optString("companyLogo", ""),
+                                customLogoUri = subObj.optString("customLogoUri", "")
                             )
                         )
                     }
@@ -376,6 +636,9 @@ class SettingsRepository(context: Context) {
                         id = obj.optString("id", UUID.randomUUID().toString()),
                         name = obj.getString("name"),
                         prefixId = obj.optString("prefixId", ""),
+                        iconName = obj.optString("iconName", ""),
+                        companyLogo = obj.optString("companyLogo", ""),
+                        customLogoUri = obj.optString("customLogoUri", ""),
                         subFolders = subList
                     )
                 )
@@ -393,12 +656,18 @@ class SettingsRepository(context: Context) {
                 put("id", cat.id)
                 put("name", cat.name)
                 put("prefixId", cat.prefixId)
+                put("iconName", cat.iconName)
+                put("companyLogo", cat.companyLogo)
+                put("customLogoUri", cat.customLogoUri)
                 val subArr = JSONArray()
                 cat.subFolders.forEach { sub ->
                     val sObj = JSONObject().apply {
                         put("id", sub.id)
                         put("name", sub.name)
                         put("prefixId", sub.prefixId)
+                        put("iconName", sub.iconName)
+                        put("companyLogo", sub.companyLogo)
+                        put("customLogoUri", sub.customLogoUri)
                     }
                     subArr.put(sObj)
                 }
@@ -408,6 +677,37 @@ class SettingsRepository(context: Context) {
         }
         prefs.edit().putString("custom_folders_hierarchy_json", array.toString()).apply()
         _folders.value = list
+    }
+
+    fun updateFolderIconAndLogo(
+        mainFolderId: String,
+        subFolderId: String? = null,
+        iconName: String,
+        companyLogo: String,
+        customLogoUri: String = ""
+    ) {
+        val updated = _folders.value.map { mainCat ->
+            val matchesMain = mainCat.id == mainFolderId || mainCat.name.equals(mainFolderId, ignoreCase = true)
+            if (subFolderId == null && matchesMain) {
+                mainCat.copy(
+                    iconName = iconName,
+                    companyLogo = companyLogo,
+                    customLogoUri = customLogoUri
+                )
+            } else if (matchesMain && subFolderId != null) {
+                val updatedSubs = mainCat.subFolders.map { sub ->
+                    if (sub.id == subFolderId || sub.name.equals(subFolderId, ignoreCase = true)) {
+                        sub.copy(
+                            iconName = iconName,
+                            companyLogo = companyLogo,
+                            customLogoUri = customLogoUri
+                        )
+                    } else sub
+                }
+                mainCat.copy(subFolders = updatedSubs)
+            } else mainCat
+        }
+        saveFolders(updated)
     }
 
     fun addMainFolder(name: String, prefixId: String = "") {

@@ -29,6 +29,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ui.DocAnizerViewModel
 import com.example.ui.components.AppLogoBanner
@@ -47,8 +48,8 @@ enum class MainNavigationTab {
 fun MainScreen(
     viewModel: DocAnizerViewModel = viewModel()
 ) {
-    val biometricAuthEnabled by viewModel.biometricAuthEnabled.collectAsState()
-    val isAppUnlocked by viewModel.isAppUnlocked.collectAsState()
+    val biometricAuthEnabled by viewModel.biometricAuthEnabled.collectAsStateWithLifecycle()
+    val isAppUnlocked by viewModel.isAppUnlocked.collectAsStateWithLifecycle()
 
     // Wenn Biometrie aktiviert und App noch gesperrt ist, Lock-Screen anzeigen
     if (biometricAuthEnabled && !isAppUnlocked) {
@@ -60,13 +61,28 @@ fun MainScreen(
     var currentTab by rememberSaveable { mutableStateOf(MainNavigationTab.DOCANIZER) }
     var isFabExpanded by rememberSaveable { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
-    val batchQueue by viewModel.batchQueue.collectAsState()
-    val isWizardCompleted by viewModel.isWizardCompleted.collectAsState()
-    val showManualWizard by viewModel.showManualConfigWizard.collectAsState()
+    val batchQueue by viewModel.batchQueue.collectAsStateWithLifecycle()
+    val isWizardCompleted by viewModel.isWizardCompleted.collectAsStateWithLifecycle()
+    val showManualWizard by viewModel.showManualConfigWizard.collectAsStateWithLifecycle()
     var sessionDismissedWizard by rememberSaveable { mutableStateOf(false) }
 
-    val p2pPendingRequests by viewModel.p2pPendingPairingRequests.collectAsState()
-    val p2pConflicts by viewModel.p2pActiveConflicts.collectAsState()
+    val targetTab by viewModel.targetNavigationTab.collectAsStateWithLifecycle()
+    LaunchedEffect(targetTab) {
+        targetTab?.let { tabStr ->
+            when (tabStr) {
+                "SCANNER" -> currentTab = MainNavigationTab.SCANNER
+                "DOCANIZER" -> currentTab = MainNavigationTab.DOCANIZER
+                "DASHBOARD" -> currentTab = MainNavigationTab.DASHBOARD
+                "BATCH_INBOX" -> currentTab = MainNavigationTab.BATCH_INBOX
+                "SETTINGS" -> currentTab = MainNavigationTab.SETTINGS
+                "IMPORT" -> currentTab = MainNavigationTab.IMPORT
+            }
+            viewModel.setTargetNavigationTab(null)
+        }
+    }
+
+    val p2pPendingRequests by viewModel.p2pPendingPairingRequests.collectAsStateWithLifecycle()
+    val p2pConflicts by viewModel.p2pActiveConflicts.collectAsStateWithLifecycle()
 
     // Animation für das Drehen des Plus-Icons im FAB (0° -> 45° wie ein Schließen-Kreuz)
     val fabRotation by animateFloatAsState(
@@ -436,7 +452,7 @@ fun MainScreen(
             )
         }
 
-        // 2. Neuer Speed-Dial FAB unten in der Mitte mit Subbuttons schräg oben links & oben rechts
+        // 2. Moderner Speed-Dial FAB unten rechts (BottomEnd) mit Subbuttons nach oben
         if (currentTab != MainNavigationTab.SCANNER) {
             val expandProgress by animateFloatAsState(
                 targetValue = if (isFabExpanded) 1f else 0f,
@@ -449,13 +465,13 @@ fun MainScreen(
 
             Box(
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 90.dp),
-                contentAlignment = Alignment.Center
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 18.dp, bottom = 96.dp),
+                contentAlignment = Alignment.BottomEnd
             ) {
-                // Diagonale Subbuttons (nur sichtbar/klickbar wenn ausgeklappt oder animiert)
+                // Vertikale Subbuttons nach oben (nur sichtbar/klickbar wenn ausgeklappt oder animiert)
                 if (isFabExpanded || expandProgress > 0.01f) {
-                    // Option 1: Doku-Scan (schräg nach oben links)
+                    // Option 1: Doku-Scan (oberer Subbutton)
                     Surface(
                         shape = RoundedCornerShape(24.dp),
                         color = MaterialTheme.colorScheme.primaryContainer,
@@ -464,8 +480,8 @@ fun MainScreen(
                         modifier = Modifier
                             .offset {
                                 IntOffset(
-                                    x = (-96.dp.toPx() * expandProgress).toInt(),
-                                    y = (-76.dp.toPx() * expandProgress).toInt()
+                                    x = (-4.dp.toPx() * expandProgress).toInt(),
+                                    y = (-116.dp.toPx() * expandProgress).toInt()
                                 )
                             }
                             .graphicsLayer {
@@ -507,7 +523,7 @@ fun MainScreen(
                         }
                     }
 
-                    // Option 2: Datei-Import (schräg nach oben rechts)
+                    // Option 2: Datei-Import (mittlerer Subbutton)
                     Surface(
                         shape = RoundedCornerShape(24.dp),
                         color = MaterialTheme.colorScheme.secondaryContainer,
@@ -516,8 +532,8 @@ fun MainScreen(
                         modifier = Modifier
                             .offset {
                                 IntOffset(
-                                    x = (96.dp.toPx() * expandProgress).toInt(),
-                                    y = (-76.dp.toPx() * expandProgress).toInt()
+                                    x = (-4.dp.toPx() * expandProgress).toInt(),
+                                    y = (-62.dp.toPx() * expandProgress).toInt()
                                 )
                             }
                             .graphicsLayer {
@@ -560,7 +576,7 @@ fun MainScreen(
                     }
                 }
 
-                // Zentraler Haupt-FAB (+)
+                // Haupt-FAB (+)
                 FloatingActionButton(
                     onClick = { isFabExpanded = !isFabExpanded },
                     containerColor = MaterialTheme.colorScheme.primary,

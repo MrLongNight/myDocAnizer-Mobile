@@ -1,9 +1,11 @@
 package com.example.model
 
+import androidx.compose.runtime.Immutable
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
+@Immutable
 @Entity(
     tableName = "documents",
     indices = [
@@ -43,7 +45,9 @@ data class DocumentEntity(
     val hasCalendarReminder: Boolean = false,   // Erinnerung aktiviert
     val calendarEventType: String = "BOTH",     // "INTERNAL", "EXTERNAL", "BOTH"
     val reminderNotes: String = "",             // Notizen zur Frist / Tarif
-    val amount: Double? = null                  // Rechnungsbetrag oder monatliche Kosten
+    val amount: Double? = null,                 // Rechnungsbetrag oder monatliche Kosten
+    val customIcon: String = "",                // Optionales benutzerdefiniertes Icon
+    val companyLogo: String = ""                // Optionales Firmenlogo (z.B. "telekom", "allianz", "amazon")
 )
 
 enum class CustomFieldType(val label: String) {
@@ -78,6 +82,7 @@ data class CustomFieldEntity(
     val targetSubCategory: String = "",
     val defaultValue: String = "",
     val isRequired: Boolean = false,
+    val iconName: String = "label", // Icon für dieses Zusatzfeld
     val createdAt: Long = System.currentTimeMillis()
 )
 
@@ -148,6 +153,42 @@ data class BankStatementEntryEntity(
     val monthYear: String = ""
 )
 
+enum class CustomWidgetType(val label: String, val description: String) {
+    FOLDER_MONITOR("Ordner- & Kategorie-Monitor", "Überwacht Belege und Gesamtsumme eines bestimmten Ordners"),
+    CUSTOM_FIELD_MONITOR("Zusatzfeld-Filter", "Überwacht Dokumente mit einem bestimmten Zusatzfeld/Wert"),
+    DEADLINE_MONITOR("Fristen- & Vertrags-Radar", "Zeigt bald ablaufende Fristen einer bestimmten Kategorie"),
+    BUDGET_LIMIT("Monatsbudget & Ausgabenlimit", "Verfolgt ein Ausgabenlimit für einen Monat"),
+    QUICK_SHORTCUT("Schnellzugriff & Aktion", "Eigener Button zum direkten Öffnen eines Ordners oder Vorlage"),
+    STICKY_NOTE("Notiz / Merkzettel", "Persönlicher Notizblock für Dokumente & Erinnerungen")
+}
+
+@Immutable
+@Entity(
+    tableName = "custom_dashboard_widgets",
+    indices = [
+        Index(value = ["position"]),
+        Index(value = ["widgetType"])
+    ]
+)
+data class CustomDashboardWidgetEntity(
+    @PrimaryKey
+    val id: String = java.util.UUID.randomUUID().toString(),
+    val title: String,
+    val subtitle: String = "",
+    val widgetType: CustomWidgetType = CustomWidgetType.FOLDER_MONITOR,
+    val targetMainCategory: String = "",
+    val targetSubCategory: String = "",
+    val targetCustomFieldId: String = "",
+    val targetCustomFieldValue: String = "",
+    val numericLimit: Double = 0.0,
+    val noteContent: String = "",
+    val colorHex: Long = 0xFF2563EB,
+    val iconName: String = "Folder",
+    val isEnabled: Boolean = true,
+    val position: Int = 0,
+    val createdAt: Long = System.currentTimeMillis()
+)
+
 data class ChatMessage(
     val id: String = java.util.UUID.randomUUID().toString(),
     val text: String,
@@ -156,6 +197,7 @@ data class ChatMessage(
     val relatedDocIds: List<Long> = emptyList()
 )
 
+@Immutable
 data class TemplateItem(
     val id: String,
     val mainCategory: String, // Ebene 1: Hauptkategorie (z.B. "Stromversorger")
@@ -176,6 +218,7 @@ enum class AppViewLevel(val title: String, val subtitle: String, val badge: Stri
     EXPERT("Experten-Ansicht", "Volle Kontrolle – Inferenz, DB-Wartung & Netzwerk", "🔴 Experte")
 }
 
+@Immutable
 data class DocTypeItem(
     val id: String = java.util.UUID.randomUUID().toString(),
     val name: String,
@@ -186,13 +229,19 @@ data class DocTypeItem(
 data class FolderSubCategoryItem(
     val id: String = java.util.UUID.randomUUID().toString(),
     val name: String,
-    val prefixId: String = ""
+    val prefixId: String = "",
+    val iconName: String = "",
+    val companyLogo: String = "",
+    val customLogoUri: String = ""
 )
 
 data class FolderCategoryItem(
     val id: String = java.util.UUID.randomUUID().toString(),
     val name: String,
     val prefixId: String = "",
+    val iconName: String = "",
+    val companyLogo: String = "",
+    val customLogoUri: String = "",
     val subFolders: List<FolderSubCategoryItem> = emptyList()
 )
 
@@ -1045,6 +1094,7 @@ val PRESET_COLOR_SKINS = listOf(
  * Wenn ein Dokument diese Schlagwörter im OCR-Text enthält, greift sofort
  * die deterministische Regel ohne Unsicherheit oder Wartezeit.
  */
+@Immutable
 data class DocRule(
     val id: String = java.util.UUID.randomUUID().toString(),
     val name: String, // z.B. "Vodafone Mobilfunk Rechnung"
@@ -1058,7 +1108,9 @@ data class DocRule(
     val isEnabled: Boolean = true,
     val confidenceScore: Float = 1.0f,
     val isAiGenerated: Boolean = false, // Ob die Regel von der lokalen KI vorgeschlagen wurde
-    val targetCustomFields: Map<String, String> = emptyMap() // Map von CustomField-ID zu Wert
+    val targetCustomFields: Map<String, String> = emptyMap(), // Map von CustomField-ID zu Wert
+    val targetIcon: String = "", // Zugeordnetes Dokument-Icon
+    val targetLogo: String = ""  // Zugeordnetes Firmenlogo
 )
 
 /**
@@ -1070,13 +1122,15 @@ enum class BatchItemStatus {
     RULE_MATCHED,    // 100% deterministischer Treffer durch Schlagwort-Regel
     AI_SUGGESTED,    // Lokales LLM hat Vorschlag generiert
     MANUAL_REVIEW,   // Wartet auf Freigabe / Korrektur durch Nutzer
-    APPROVED         // Vom Nutzer geprüft & freigegeben
+    APPROVED,        // Vom Nutzer geprüft & freigegeben
+    ERROR            // Fehler bei OCR/Verarbeitung
 }
 
 /**
  * Element im Stapel-Puffer (Inbox).
  * Ermöglicht schnelles Durchscannen eines Stapels und anschließendes Prüfen/Freigeben.
  */
+@Immutable
 data class BatchDocumentItem(
     val id: String = java.util.UUID.randomUUID().toString(),
     val tempImagePaths: List<String>,

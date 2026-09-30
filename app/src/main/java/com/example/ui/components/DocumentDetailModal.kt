@@ -33,13 +33,31 @@ fun DocumentDetailModal(
     onUpdateContractReminder: ((Long, Long?, Long?, Int, Boolean, String, String, Double?) -> Unit)? = null,
     allCustomFields: List<com.example.model.CustomFieldEntity> = emptyList(),
     documentCustomFieldValues: List<com.example.model.DocumentCustomFieldValueEntity> = emptyList(),
-    onUpdateCustomFieldValue: ((Long, String, String) -> Unit)? = null
+    onUpdateCustomFieldValue: ((Long, String, String) -> Unit)? = null,
+    onUpdateDocumentIconAndLogo: ((Long, String, String) -> Unit)? = null
 ) {
     val context = LocalContext.current
     var currentDocType by remember { mutableStateOf(document.docType) }
     var showTypePicker by remember { mutableStateOf(false) }
+    var showIconPickerDialog by remember { mutableStateOf(false) }
     val isImage = document.fileName.endsWith(".jpg", ignoreCase = true) ||
             document.fileName.endsWith(".png", ignoreCase = true)
+
+    if (showIconPickerDialog) {
+        UniversalIconAndLogoPickerDialog(
+            title = "Dokument-Icon & Logo",
+            subtitle = document.title,
+            currentIcon = document.customIcon,
+            currentLogo = document.companyLogo,
+            currentCustomLogoUri = "",
+            isFolder = false,
+            onSave = { iconName, companyLogo, _ ->
+                onUpdateDocumentIconAndLogo?.invoke(document.id, iconName, companyLogo)
+                showIconPickerDialog = false
+            },
+            onDismiss = { showIconPickerDialog = false }
+        )
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
@@ -57,22 +75,23 @@ fun DocumentDetailModal(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(if (isImage) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.primaryContainer),
-                    contentAlignment = Alignment.Center
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier.clickable { showIconPickerDialog = true }
                 ) {
-                    Icon(
-                        imageVector = if (isImage) Icons.Default.Image else Icons.Default.PictureAsPdf,
-                        contentDescription = null,
-                        tint = if (isImage) MaterialTheme.colorScheme.onTertiaryContainer else MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(28.dp)
-                    )
+                    Box(contentAlignment = Alignment.BottomEnd) {
+                        DocumentOrFolderIcon(
+                            iconName = document.customIcon,
+                            companyLogo = document.companyLogo,
+                            isFolder = false,
+                            isImage = isImage,
+                            size = 52.dp
+                        )
+                    }
                 }
 
-                Spacer(modifier = Modifier.width(16.dp))
+                Spacer(modifier = Modifier.width(14.dp))
 
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
@@ -85,6 +104,21 @@ fun DocumentDetailModal(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
+                        modifier = Modifier.clickable { showIconPickerDialog = true }
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Icon(Icons.Default.Edit, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(12.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Icon / Logo anpassen", fontSize = 11.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                        }
+                    }
                 }
             }
 

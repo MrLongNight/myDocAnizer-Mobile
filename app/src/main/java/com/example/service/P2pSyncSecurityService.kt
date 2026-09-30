@@ -43,9 +43,39 @@ object P2pSyncSecurityService {
      */
     fun deriveKeyFromPin(pin: String, salt: ByteArray = STATIC_SALT): ByteArray {
         val cleanPin = pin.replace(" ", "").trim()
-        val spec = PBEKeySpec(cleanPin.toCharArray(), salt, PBKDF2_ITERATIONS, PBKDF2_KEY_LENGTH)
+        val pinChars = cleanPin.toCharArray()
+        val spec = PBEKeySpec(pinChars, salt, PBKDF2_ITERATIONS, PBKDF2_KEY_LENGTH)
         val factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
-        return factory.generateSecret(spec).encoded
+        try {
+            val secretKey = factory.generateSecret(spec)
+            val keyBytes = secretKey.encoded
+            val copy = keyBytes.copyOf()
+            keyBytes.fill(0)
+            return copy
+        } finally {
+            spec.clearPassword()
+            pinChars.fill('\u0000')
+        }
+    }
+
+    /**
+     * Zero-Knowledge RAM Hygiene: Leitet einen SecretKeySpec ab und überschreibt
+     * alle sensiblen Passwort-Chars und temporären Schlüssel-Bytes im Heap unverzüglich.
+     */
+    fun deriveKey(password: String, salt: ByteArray = STATIC_SALT): SecretKeySpec {
+        val factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
+        val passwordChars = password.toCharArray()
+        val spec = PBEKeySpec(passwordChars, salt, PBKDF2_ITERATIONS, PBKDF2_KEY_LENGTH)
+        try {
+            val secretKey = factory.generateSecret(spec)
+            val keyBytes = secretKey.encoded
+            val keySpec = SecretKeySpec(keyBytes, "AES")
+            keyBytes.fill(0) // Roh-Byte-Array im RAM sofort mit Nullen überschreiben
+            return keySpec
+        } finally {
+            spec.clearPassword() // PBEKeySpec intern leeren
+            passwordChars.fill('\u0000') // Passwort-Zeichen im RAM sicher neutralisieren
+        }
     }
 
     /**
@@ -118,7 +148,9 @@ object P2pSyncSecurityService {
             val cipher = Cipher.getInstance("AES/GCM/NoPadding")
             cipher.init(Cipher.DECRYPT_MODE, secretKey, GCMParameterSpec(GCM_TAG_LENGTH_BITS, iv))
 
-            cipher.doFinal(cipherBytes)
+            val decrypted = cipher.doFinal(cipherBytes)
+            cipherBytes.fill(0)
+            decrypted
         } catch (e: Exception) {
             null
         }

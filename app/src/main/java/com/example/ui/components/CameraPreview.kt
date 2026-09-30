@@ -322,7 +322,7 @@ fun imageProxyToBitmap(image: ImageProxy, maxDimension: Int = 2400): Bitmap? {
         } else {
             rotated
         }
-    } catch (e: Exception) {
+    } catch (e: Throwable) {
         Log.e("CameraPreview", "image.toBitmap() fehlgeschlagen, versuche direkten Byte-Puffer: ${e.message}")
         try {
             val plane = image.planes.firstOrNull() ?: return null

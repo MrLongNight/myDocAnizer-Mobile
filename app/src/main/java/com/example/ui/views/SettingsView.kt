@@ -64,6 +64,8 @@ import java.util.UUID
  * 3. PDF & Scan (DPI, Kompression, Ordner-Präfixe A01_B1.01-)
  * 4. Erscheinungsbild (Dark Mode, Light Mode, System)
  */
+data class SettingsTabItem(val title: String, val icon: ImageVector)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsView(
@@ -77,18 +79,19 @@ fun SettingsView(
     val isExpertMode by viewModel.isExpertMode.collectAsState()
     val isAdvancedOrExpert by viewModel.isAdvancedOrExpert.collectAsState()
 
-    data class TabInfo(val title: String, val icon: ImageVector)
     val tabs = listOf(
-        TabInfo("Scanner & Kamera", Icons.Default.PhotoCamera),
-        TabInfo("PDF & Optimierung", Icons.Default.PictureAsPdf),
-        TabInfo("Ein-&Ausgaben", Icons.Default.AccountBalanceWallet),
-        TabInfo("Dokumenten-Gruppen", Icons.Default.Label),
-        TabInfo("Regeln & KI", Icons.Default.AutoAwesome),
-        TabInfo("Sicherheit", Icons.Default.Security),
-        TabInfo("WLAN & P2P Sync", Icons.Default.SyncAlt),
-        TabInfo("Cloud & Backup", Icons.Default.CloudSync),
-        TabInfo("Design", Icons.Default.Palette)
+        SettingsTabItem("Scanner & Kamera", Icons.Default.PhotoCamera),
+        SettingsTabItem("PDF & Optimierung", Icons.Default.PictureAsPdf),
+        SettingsTabItem("Ein-&Ausgaben", Icons.Default.AccountBalanceWallet),
+        SettingsTabItem("Gruppen & Zusatzfelder", Icons.Default.Label),
+        SettingsTabItem("Regeln & KI", Icons.Default.AutoAwesome),
+        SettingsTabItem("Sicherheit", Icons.Default.Security),
+        SettingsTabItem("WLAN & P2P Sync", Icons.Default.SyncAlt),
+        SettingsTabItem("Cloud & Backup", Icons.Default.CloudSync),
+        SettingsTabItem("Design", Icons.Default.Palette)
     )
+
+    var showSectionOverviewDialog by remember { mutableStateOf(false) }
 
     // Automatisches sanftes Sichtbarmachen des aktiven Tabs
     LaunchedEffect(selectedSettingsTab) {
@@ -296,18 +299,61 @@ fun SettingsView(
             }
         }
 
-        // Tab-Leiste für Einstellungen mit dynamischen Pfeilen
+        // Tab-Leiste für Einstellungen mit dynamischen Pfeilen & Direkt-Übersicht
         Surface(
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 2.dp,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(64.dp),
-                contentAlignment = Alignment.CenterStart
-            ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            imageVector = tabs[selectedSettingsTab].icon,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = tabs[selectedSettingsTab].title,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    OutlinedButton(
+                        onClick = { showSectionOverviewDialog = true },
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                        modifier = Modifier
+                            .height(28.dp)
+                            .testTag("btn_all_settings_tabs")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.GridView,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Alle 9 Bereiche auf einen Blick", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                    contentAlignment = Alignment.CenterStart
+                ) {
                 // Scrollbare Tabs
                 Row(
                     modifier = Modifier
@@ -440,6 +486,7 @@ fun SettingsView(
                 }
             }
         }
+    }
 
         when (selectedSettingsTab) {
             0 -> ScannerSettingsTab(viewModel)
@@ -451,6 +498,15 @@ fun SettingsView(
             6 -> P2pSyncTab(viewModel)
             7 -> CloudSyncSettingsTab(viewModel)
             8 -> DesignSettingsTab(viewModel)
+        }
+
+        if (showSectionOverviewDialog) {
+            SettingsTabOverviewDialog(
+                tabs = tabs,
+                selectedIndex = selectedSettingsTab,
+                onSelectTab = { selectedSettingsTab = it },
+                onDismiss = { showSectionOverviewDialog = false }
+            )
         }
     }
 }
@@ -949,7 +1005,6 @@ fun IncomeExpenseSettingsTab(viewModel: DocAnizerViewModel) {
     val enableReceiptExpenses by viewModel.enableReceiptExpenses.collectAsState()
     val enableBankStatementImport by viewModel.enableBankStatementImport.collectAsState()
     val enableMonthlyReconciliation by viewModel.enableMonthlyReconciliation.collectAsState()
-    val toleranceDays by viewModel.reconciliationToleranceDays.collectAsState()
     val notifyDiscrepancies by viewModel.notifyReconciliationDiscrepancies.collectAsState()
 
     val allThreeActive = enableCashTracker && enableReceiptExpenses && enableBankStatementImport
@@ -1177,7 +1232,7 @@ fun IncomeExpenseSettingsTab(viewModel: DocAnizerViewModel) {
                                     )
                                     Column {
                                         Text(
-                                            text = "Automatischer monatlicher Datenabgleich",
+                                            text = "Ausgaben- & Beleg-Check",
                                             style = MaterialTheme.typography.bodyMedium,
                                             fontWeight = FontWeight.Bold
                                         )
@@ -1186,7 +1241,7 @@ fun IncomeExpenseSettingsTab(viewModel: DocAnizerViewModel) {
                                             color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.15f)
                                         ) {
                                             Text(
-                                                text = "FÜR STEUERBERATER & BELEG-LÜCKENPRÜFUNG",
+                                                text = "BARGELD & QUITTUNGEN",
                                                 style = MaterialTheme.typography.labelSmall,
                                                 fontWeight = FontWeight.Bold,
                                                 color = MaterialTheme.colorScheme.tertiary,
@@ -1202,7 +1257,7 @@ fun IncomeExpenseSettingsTab(viewModel: DocAnizerViewModel) {
                             }
 
                             Text(
-                                text = "Gleicht deine Bargeld-Abhebungen vom Kontoauszug (z. B. Geldautomat 200 €) automatisch mit den erfassten Bar-Belegen ab. So werden vergessene Quittungen sofort sichtbar, damit Steuererklärung und Buchhaltung zu 100% lückenlos und nachvollziehbar belegt sind.",
+                                text = "Gleicht deine Bargeld-Abhebungen vom Kontoauszug (z. B. Geldautomat 200 €) mit deinen erfassten Bar-Belegen und Barausgaben ab. Ideal für alle, die häufig mit Bargeld bezahlen: Kontrolliere selbst, wofür dein Bargeld ausgegeben wurde, finde vergessene Quittungen und erkenne Einsparpotenziale (optional auch als Nachweis nutzbar).",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -1217,12 +1272,12 @@ fun IncomeExpenseSettingsTab(viewModel: DocAnizerViewModel) {
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(
-                                            text = "Lücken- & Differenzhinweise",
+                                            text = "Hinweis bei unklaren Bargeldausgaben",
                                             style = MaterialTheme.typography.labelLarge,
                                             fontWeight = FontWeight.SemiBold
                                         )
                                         Text(
-                                            text = "Am Monatsende warnen, falls Barabhebungen und Belege abweichen.",
+                                            text = "Am Monatsende benachrichtigen, wenn Barabhebungen und Belege voneinander abweichen.",
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
@@ -1231,34 +1286,6 @@ fun IncomeExpenseSettingsTab(viewModel: DocAnizerViewModel) {
                                         checked = notifyDiscrepancies,
                                         onCheckedChange = { viewModel.setNotifyReconciliationDiscrepancies(it) }
                                     )
-                                }
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = "Toleranzfenster für Zuordnung",
-                                            style = MaterialTheme.typography.labelLarge,
-                                            fontWeight = FontWeight.SemiBold
-                                        )
-                                        Text(
-                                            text = "Max. $toleranceDays Tage Differenz zwischen Abhebung und Belegdatum",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                        listOf(3, 5, 7).forEach { days ->
-                                            FilterChip(
-                                                selected = toleranceDays == days,
-                                                onClick = { viewModel.setReconciliationToleranceDays(days) },
-                                                label = { Text("${days}T") }
-                                            )
-                                        }
-                                    }
                                 }
                             }
                         }
@@ -1300,9 +1327,18 @@ fun IncomeExpenseSettingsTab(viewModel: DocAnizerViewModel) {
 @Composable
 fun DocTypesSettingsTab(viewModel: DocAnizerViewModel) {
     val docTypes by viewModel.docTypes.collectAsState()
+    val customFields by viewModel.customFields.collectAsState()
+    val allCustomFieldValues by viewModel.allDocumentCustomFieldValues.collectAsState()
+
+    var activeSubSection by remember { mutableStateOf(0) } // 0: Doc-Typen, 1: Zusatzfelder
+
     var showEditorDialog by remember { mutableStateOf(false) }
     var editingDocType by remember { mutableStateOf<DocTypeItem?>(null) }
     var docTypeToDelete by remember { mutableStateOf<DocTypeItem?>(null) }
+
+    var showCustomFieldEditor by remember { mutableStateOf(false) }
+    var editingCustomField by remember { mutableStateOf<com.example.model.CustomFieldEntity?>(null) }
+    var customFieldToDelete by remember { mutableStateOf<com.example.model.CustomFieldEntity?>(null) }
 
     Column(
         modifier = Modifier
@@ -1311,6 +1347,24 @@ fun DocTypesSettingsTab(viewModel: DocAnizerViewModel) {
             .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        TabRow(
+            selectedTabIndex = activeSubSection,
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            modifier = Modifier.clip(RoundedCornerShape(12.dp))
+        ) {
+            Tab(
+                selected = activeSubSection == 0,
+                onClick = { activeSubSection = 0 },
+                text = { Text("Doc-Typen (${docTypes.size})", fontWeight = if (activeSubSection == 0) FontWeight.Bold else FontWeight.Normal) }
+            )
+            Tab(
+                selected = activeSubSection == 1,
+                onClick = { activeSubSection = 1 },
+                text = { Text("Zusatzfelder (${customFields.size})", fontWeight = if (activeSubSection == 1) FontWeight.Bold else FontWeight.Normal) }
+            )
+        }
+
+        if (activeSubSection == 0) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -1457,6 +1511,121 @@ fun DocTypesSettingsTab(viewModel: DocAnizerViewModel) {
                     }
                 }
             }
+            }
+        } else {
+            // ZUSATZFELDER BEREICH
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Individuelle Zusatzfelder",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "Definiere eigene Metadaten-Felder. Die lokale KI befüllt diese automatisch beim Scannen, oder du bearbeitest sie manuell.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                FilledTonalButton(
+                    onClick = {
+                        editingCustomField = null
+                        showCustomFieldEditor = true
+                    }
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Feld +")
+                }
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            if (customFields.isEmpty()) {
+                Card(
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(20.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Tune,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            modifier = Modifier.size(40.dp)
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Noch keine Zusatzfelder vorhanden",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Tippe auf 'Feld +', um eigene Datenfelder (z. B. Projekt, Kostenstelle, Garantiezeit) anzulegen.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            } else {
+                Card(
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        customFields.forEach { field ->
+                            val usageCount = allCustomFieldValues.count { it.customFieldId == field.id && it.fieldValue.isNotBlank() }
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = field.name,
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Text(
+                                        text = "Typ: ${field.type.name} • $usageCount Dokumente verknüpft",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Row {
+                                    IconButton(onClick = {
+                                        editingCustomField = field
+                                        showCustomFieldEditor = true
+                                    }) {
+                                        Icon(Icons.Default.Edit, contentDescription = "Bearbeiten", tint = MaterialTheme.colorScheme.primary)
+                                    }
+                                    IconButton(onClick = { customFieldToDelete = field }) {
+                                        Icon(Icons.Default.DeleteOutline, contentDescription = "Löschen", tint = MaterialTheme.colorScheme.error)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -1498,6 +1667,84 @@ fun DocTypesSettingsTab(viewModel: DocAnizerViewModel) {
                 TextButton(onClick = { docTypeToDelete = null }) {
                     Text("Abbrechen")
                 }
+            }
+        )
+    }
+
+    // Dialog zum Erstellen / Bearbeiten von Zusatzfeldern
+    if (showCustomFieldEditor) {
+        var fieldName by remember { mutableStateOf(editingCustomField?.name.orEmpty()) }
+        var fieldDesc by remember { mutableStateOf(editingCustomField?.description.orEmpty()) }
+
+        AlertDialog(
+            onDismissRequest = { showCustomFieldEditor = false },
+            title = { Text(if (editingCustomField != null) "Zusatzfeld bearbeiten" else "Neues Zusatzfeld anlegen", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = fieldName,
+                        onValueChange = { fieldName = it },
+                        label = { Text("Feld-Name (z.B. Projekt, Garantie bis)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = fieldDesc,
+                        onValueChange = { fieldDesc = it },
+                        label = { Text("Beschreibung / KI-Hinweis (Optional)") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (fieldName.isNotBlank()) {
+                            val current = editingCustomField
+                            if (current != null) {
+                                viewModel.updateCustomField(current.copy(name = fieldName.trim(), description = fieldDesc.trim()))
+                            } else {
+                                viewModel.addCustomField(
+                                    com.example.model.CustomFieldEntity(
+                                        name = fieldName.trim(),
+                                        description = fieldDesc.trim(),
+                                        type = com.example.model.CustomFieldType.TEXT
+                                    )
+                                )
+                            }
+                            showCustomFieldEditor = false
+                        }
+                    }
+                ) {
+                    Text("Speichern")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCustomFieldEditor = false }) { Text("Abbrechen") }
+            }
+        )
+    }
+
+    // Dialog zum Löschen von Zusatzfeldern
+    if (customFieldToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { customFieldToDelete = null },
+            title = { Text("Zusatzfeld löschen?") },
+            text = { Text("Möchtest du das Feld '${customFieldToDelete?.name}' wirklich löschen? Bestehende Dokumente behalten ihre Texte.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val toDel = customFieldToDelete ?: return@Button
+                        viewModel.deleteCustomField(toDel.id)
+                        customFieldToDelete = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Löschen")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { customFieldToDelete = null }) { Text("Abbrechen") }
             }
         )
     }
@@ -4140,4 +4387,93 @@ fun CloudSyncSettingsTab(viewModel: DocAnizerViewModel) {
             }
         )
     }
+}
+
+@Composable
+private fun SettingsTabOverviewDialog(
+    tabs: List<SettingsTabItem>,
+    selectedIndex: Int,
+    onSelectTab: (Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(Icons.Default.GridView, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Text("Einstellungs-Bereiche", fontWeight = FontWeight.Bold)
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "Direkter Wechsel ohne horizontales Scrollen:",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                val rows = tabs.chunked(2)
+                rows.forEach { rowTabs ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        rowTabs.forEach { tab ->
+                            val index = tabs.indexOf(tab)
+                            val isSelected = index == selectedIndex
+
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                border = BorderStroke(
+                                    width = if (isSelected) 1.5.dp else 1.dp,
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                                ),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable {
+                                        onSelectTab(index)
+                                        onDismiss()
+                                    }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = tab.icon,
+                                        contentDescription = null,
+                                        tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Text(
+                                        text = tab.title,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+                        }
+                        if (rowTabs.size == 1) {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Schließen") }
+        }
+    )
 }

@@ -322,6 +322,7 @@ fun BatchItemCard(
     val isAiMatch = item.status == BatchItemStatus.AI_SUGGESTED
     val isPending = item.status == BatchItemStatus.PENDING_PROCESS
     val isWaiting = item.status == BatchItemStatus.WAITING_OCR
+    val isError = item.status == BatchItemStatus.ERROR
 
     Surface(
         shape = RoundedCornerShape(16.dp),
@@ -330,6 +331,7 @@ fun BatchItemCard(
         border = BorderStroke(
             width = if (isRuleMatch) 1.5.dp else 1.dp,
             color = when {
+                isError -> MaterialTheme.colorScheme.error
                 isRuleMatch -> Color(0xFF10B981)
                 isAiMatch -> MaterialTheme.colorScheme.primary
                 isPending -> Color(0xFFF59E0B)
@@ -349,6 +351,7 @@ fun BatchItemCard(
                 Surface(
                     shape = RoundedCornerShape(8.dp),
                     color = when {
+                        isError -> MaterialTheme.colorScheme.errorContainer
                         isRuleMatch -> Color(0xFF10B981).copy(alpha = 0.15f)
                         isAiMatch -> MaterialTheme.colorScheme.primaryContainer
                         isPending -> Color(0xFFFEF3C7)
@@ -361,6 +364,7 @@ fun BatchItemCard(
                     ) {
                         Icon(
                             imageVector = when {
+                                isError -> Icons.Default.Error
                                 isRuleMatch -> Icons.Default.CheckCircle
                                 isAiMatch -> Icons.Default.AutoAwesome
                                 isPending -> Icons.Default.PauseCircle
@@ -368,6 +372,7 @@ fun BatchItemCard(
                             },
                             contentDescription = null,
                             tint = when {
+                                isError -> MaterialTheme.colorScheme.error
                                 isRuleMatch -> Color(0xFF10B981)
                                 isAiMatch -> MaterialTheme.colorScheme.primary
                                 isPending -> Color(0xFFD97706)
@@ -378,6 +383,7 @@ fun BatchItemCard(
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = when {
+                                isError -> "Fehler bei Analyse"
                                 isRuleMatch -> "Regel: ${item.matchedRuleName ?: "Treffer"}"
                                 isAiMatch -> "KI-Vorschlag"
                                 isPending -> "Wartet auf Stapel-Start"
@@ -386,6 +392,7 @@ fun BatchItemCard(
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             color = when {
+                                isError -> MaterialTheme.colorScheme.onErrorContainer
                                 isRuleMatch -> Color(0xFF047857)
                                 isAiMatch -> MaterialTheme.colorScheme.primary
                                 isPending -> Color(0xFFB45309)

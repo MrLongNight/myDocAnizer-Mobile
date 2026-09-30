@@ -60,7 +60,6 @@ fun ReconciliationDialog(
     val cashTransactions by viewModel.cashTransactions.collectAsState()
     val bankStatementEntries by viewModel.bankStatementEntries.collectAsState()
     val allDocuments by viewModel.allDocuments.collectAsState()
-    val toleranceDays by viewModel.reconciliationToleranceDays.collectAsState()
 
     // Aktueller und vergangene Monate zur Auswahl (letzte 6 Monate)
     val monthOptions = remember {
@@ -81,6 +80,7 @@ fun ReconciliationDialog(
 
     var showAddCashDialog by remember { mutableStateOf(false) }
     var showAddBankEntryDialog by remember { mutableStateOf(false) }
+    var showImportDialog by remember { mutableStateOf(false) }
     var showPrivateWithdrawalDialog by remember { mutableStateOf<Double?>(null) }
 
     // Filtere Buchungen für den ausgewählten Monat
@@ -144,12 +144,12 @@ fun ReconciliationDialog(
                     title = {
                         Column {
                             Text(
-                                text = "Kassen- & Beleg-Abgleich",
+                                text = "Ausgaben- & Beleg-Check",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "Lückenlose Nachweisführung für Steuerberater",
+                                text = "Bargeld & Quittungen: Wo ist das Geld geblieben & fehlen Belege?",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -181,7 +181,7 @@ fun ReconciliationDialog(
                         ) {
                             Icon(Icons.Default.PictureAsPdf, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Prüfbericht", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Text("Übersicht als PDF", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
@@ -214,7 +214,7 @@ fun ReconciliationDialog(
                                     color = MaterialTheme.colorScheme.primary
                                 )
                                 Text(
-                                    text = "Toleranzfenster: ±$toleranceDays Tage",
+                                    text = "Monatliche Selbstkontrolle",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -256,13 +256,13 @@ fun ReconciliationDialog(
                                 Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF10B981), modifier = Modifier.size(28.dp))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = "100% BELEGT & GEKLÄRT 🎉",
+                                        text = "100% NACHVOLLZIEHBAR & ERFASST 🎉",
                                         style = MaterialTheme.typography.bodyMedium,
                                         fontWeight = FontWeight.Bold,
                                         color = Color(0xFF065F46)
                                     )
                                     Text(
-                                        text = "Alle Bargeldabhebungen (${currencyFormat.format(totalWithdrawals)}) stimmen exakt mit deinen Bar-Belegen und Entnahmen überein. Perfekt für deinen Steuerberater!",
+                                        text = "Alle Bargeldabhebungen (${currencyFormat.format(totalWithdrawals)}) stimmen exakt mit deinen Bar-Belegen und Ausgaben überein. Volle Transparenz über deine Finanzen!",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = Color(0xFF065F46)
                                     )
@@ -284,16 +284,16 @@ fun ReconciliationDialog(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
-                                    Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(26.dp))
+                                    Icon(Icons.Default.HelpOutline, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(26.dp))
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(
-                                            text = "LÜCKE ENTDECKT: ${currencyFormat.format(difference)} ungeklärt!",
+                                            text = "Offener Bar-Betrag: ${currencyFormat.format(difference)}",
                                             style = MaterialTheme.typography.bodyMedium,
                                             fontWeight = FontWeight.Bold,
                                             color = MaterialTheme.colorScheme.onErrorContainer
                                         )
                                         Text(
-                                            text = "Du hast mehr Bargeld vom Konto abgehoben (${currencyFormat.format(totalWithdrawals)}) als bisher durch Bar-Belege nachgewiesen (${currencyFormat.format(totalReceiptsAndExpenses)}).",
+                                            text = "Du hast mehr Bargeld abgehoben (${currencyFormat.format(totalWithdrawals)}) als bisher durch Bar-Belege nachgewiesen (${currencyFormat.format(totalReceiptsAndExpenses)}). Trage fehlende Quittungen oder Barausgaben nach.",
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onErrorContainer
                                         )
@@ -303,7 +303,7 @@ fun ReconciliationDialog(
                                 HorizontalDivider(color = MaterialTheme.colorScheme.error.copy(alpha = 0.3f))
 
                                 Text(
-                                    text = "SOFORT-LÖSUNG ZUR STEUERLICHEN KORREKTUR:",
+                                    text = "SCHNELLE ERFASSUNG:",
                                     style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onErrorContainer
@@ -333,9 +333,9 @@ fun ReconciliationDialog(
                                         modifier = Modifier.weight(1f),
                                         contentPadding = PaddingValues(vertical = 6.dp)
                                     ) {
-                                        Icon(Icons.Default.AccountBalance, contentDescription = null, modifier = Modifier.size(14.dp))
+                                        Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, modifier = Modifier.size(14.dp))
                                         Spacer(modifier = Modifier.width(4.dp))
-                                        Text("Als Privatentnahme", fontSize = 11.sp)
+                                        Text("Als Barausgabe", fontSize = 11.sp)
                                     }
                                 }
                             }
@@ -364,6 +364,16 @@ fun ReconciliationDialog(
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    FilledTonalButton(
+                                        onClick = { showImportDialog = true },
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                        modifier = Modifier.testTag("btn_quick_import_statement")
+                                    ) {
+                                        Icon(Icons.Default.FileOpen, contentDescription = null, modifier = Modifier.size(14.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Kontoauszug importieren (CSV/PDF)", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
                                 }
                             }
                         }
@@ -408,14 +418,29 @@ fun ReconciliationDialog(
                                     }
                                 }
 
-                                OutlinedButton(
-                                    onClick = { showAddBankEntryDialog = true },
+                                Row(
                                     modifier = Modifier.fillMaxWidth(),
-                                    contentPadding = PaddingValues(vertical = 4.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
-                                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(14.dp))
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text("Abhebung +", fontSize = 11.sp)
+                                    OutlinedButton(
+                                        onClick = { showAddBankEntryDialog = true },
+                                        modifier = Modifier.weight(1f),
+                                        contentPadding = PaddingValues(vertical = 4.dp, horizontal = 2.dp)
+                                    ) {
+                                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(13.dp))
+                                        Spacer(modifier = Modifier.width(2.dp))
+                                        Text("Manuell", fontSize = 10.sp)
+                                    }
+
+                                    FilledTonalButton(
+                                        onClick = { showImportDialog = true },
+                                        modifier = Modifier.weight(1.3f),
+                                        contentPadding = PaddingValues(vertical = 4.dp, horizontal = 2.dp)
+                                    ) {
+                                        Icon(Icons.Default.FileOpen, contentDescription = null, modifier = Modifier.size(13.dp))
+                                        Spacer(modifier = Modifier.width(2.dp))
+                                        Text("Import (CSV)", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                    }
                                 }
                             }
                         }
@@ -476,7 +501,7 @@ fun ReconciliationDialog(
                         }
                     }
 
-                    // ERKLÄRUNG FÜR DEN STEUERBERATER
+                    // ERKLÄRUNG ZUR SELBSTKONTROLLE
                     Card(
                         shape = RoundedCornerShape(12.dp),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)),
@@ -489,10 +514,10 @@ fun ReconciliationDialog(
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 Icon(Icons.Default.VerifiedUser, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-                                Text("Rechtssicherheit & Nachweis", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                                Text("Persönliche Finanz-Selbstkontrolle", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
                             }
                             Text(
-                                text = "Der automatische Monatsabgleich verhindert, dass bei der Betriebsprüfung oder Einkommensteuererklärung ungeklärte Bargeldentnahmen beanstandet werden. Über den Prüfbericht oben rechts erhält dein Steuerberater eine fertige Gegenüberstellung inklusive Bestätigungsklausel.",
+                                text = "Gleicht deine Bargeldabhebungen mit deinen erfassten Quittungen und Barausgaben ab. Ideal um den Überblick über Bar-Zahlungen zu behalten, vergessene Belege aufzuspüren und Einsparpotenziale zu erkennen (optional auch als Nachweis z. B. für Steuer/Buchhaltung nutzbar).",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -527,6 +552,18 @@ fun ReconciliationDialog(
         )
     }
 
+    // DIALOG: KONTOAUSZUG IMPORTIEREN (CSV / PDF)
+    if (showImportDialog) {
+        BankStatementImportDialog(
+            viewModel = viewModel,
+            defaultMonthKey = selectedMonthKey,
+            onDismiss = { showImportDialog = false },
+            onImportSuccess = { count ->
+                Toast.makeText(context, "$count Buchungen erfolgreich importiert!", Toast.LENGTH_SHORT).show()
+            }
+        )
+    }
+
     // DIALOG: PRIVATENTNAHME BUCHEN (LÜCKENSCHLUSS)
     showPrivateWithdrawalDialog?.let { diffAmount ->
         AddPrivateWithdrawalDialog(
@@ -543,13 +580,14 @@ fun ReconciliationDialog(
 }
 
 @Composable
-private fun AddCashTransactionDialog(
+fun AddCashTransactionDialog(
     defaultMonthKey: String,
+    initialAmount: Double = 0.0,
     onDismiss: () -> Unit,
     onSave: (CashTransactionEntity) -> Unit
 ) {
-    var title by remember { mutableStateOf("") }
-    var amountStr by remember { mutableStateOf("") }
+    var title by remember { mutableStateOf(if (initialAmount > 0) "Bar-Ausgabe" else "") }
+    var amountStr by remember { mutableStateOf(if (initialAmount > 0) String.format(Locale.GERMANY, "%.2f", initialAmount) else "") }
     var category by remember { mutableStateOf("Tagesausgaben") }
     var note by remember { mutableStateOf("") }
 
@@ -681,17 +719,17 @@ private fun AddPrivateWithdrawalDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Als Privatentnahme buchen", fontWeight = FontWeight.Bold) },
+        title = { Text("Als Barausgabe eintragen", fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    text = "Möchtest du die Differenz von ${String.format(Locale.GERMANY, "%.2f €", amount)} als Privatentnahme (Eigenbedarf) buchen? Damit ist die Bargeldabhebung steuerlich zu 100% geklärt und erfordert keine weiteren Quittungen.",
+                    text = "Möchtest du den Betrag von ${String.format(Locale.GERMANY, "%.2f €", amount)} als Barausgabe (z. B. für Einkäufe ohne Quittung, Restaurant oder Taschengeld) verbuchen?",
                     style = MaterialTheme.typography.bodySmall
                 )
                 OutlinedTextField(
                     value = note,
                     onValueChange = { note = it },
-                    label = { Text("Buchungsvermerk / Begründung") },
+                    label = { Text("Zweck / Notiz (optional)") },
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -701,17 +739,17 @@ private fun AddPrivateWithdrawalDialog(
                 onClick = {
                     onConfirm(
                         CashTransactionEntity(
-                            title = "Privatentnahme (geklärt)",
+                            title = if (note.isNotBlank()) note else "Barausgabe / Eigenbedarf",
                             amount = amount,
-                            type = CashTransactionType.PRIVATE_WITHDRAWAL,
-                            category = "Privat",
+                            type = CashTransactionType.EXPENSE,
+                            category = "Bargeld",
                             note = note,
                             matchReconciliationMonth = monthKey
                         )
                     )
                 }
             ) {
-                Text("Jetzt buchen")
+                Text("Jetzt eintragen")
             }
         },
         dismissButton = {
@@ -744,12 +782,12 @@ private fun generateAndShareReconciliationReport(
         paint.textSize = 16f
         paint.isFakeBoldText = true
         paint.color = android.graphics.Color.BLACK
-        canvas.drawText("myDocAnizer-Mobile • Monatsabgleich-Prüfbericht", 40f, 45f, paint)
+        canvas.drawText("myDocAnizer-Mobile • Bargeld- & Beleg-Übersicht", 40f, 45f, paint)
 
         paint.textSize = 10f
         paint.isFakeBoldText = false
         paint.color = android.graphics.Color.DKGRAY
-        canvas.drawText("Prüfungszeitraum: $monthLabel | Erstellt am: ${df.format(Date())} | Mandanten-Dokumentation", 40f, 65f, paint)
+        canvas.drawText("Zeitraum: $monthLabel | Erstellt am: ${df.format(Date())} | Persönliche Haushalts- & Finanzkontrolle", 40f, 65f, paint)
 
         paint.color = android.graphics.Color.LTGRAY
         paint.strokeWidth = 1f
@@ -759,16 +797,16 @@ private fun generateAndShareReconciliationReport(
         paint.textSize = 12f
         paint.isFakeBoldText = true
         paint.color = android.graphics.Color.BLACK
-        canvas.drawText("1. Gesamtergebnis Kassen- & Belegprüfung", 40f, 100f, paint)
+        canvas.drawText("1. Gesamtergebnis Bargeld & Belege", 40f, 100f, paint)
 
         paint.textSize = 10f
         paint.isFakeBoldText = false
-        canvas.drawText("• Bargeldabhebungen vom Konto (Soll): ${currFmt.format(totalWithdrawals)}", 50f, 120f, paint)
+        canvas.drawText("• Bargeldabhebungen vom Girokonto: ${currFmt.format(totalWithdrawals)}", 50f, 120f, paint)
         canvas.drawText("• Erfasste Belege & Barausgaben: ${currFmt.format(totalReceipts)}", 50f, 135f, paint)
-        canvas.drawText("• Deklarierte Privatentnahmen: ${currFmt.format(totalPrivate)}", 50f, 150f, paint)
+        canvas.drawText("• Sonstige Barausgaben / Eigenbedarf: ${currFmt.format(totalPrivate)}", 50f, 150f, paint)
 
         paint.isFakeBoldText = true
-        val statusText = if (abs(difference) < 0.01) "0,00 € (VOLLSTÄNDIG GEKLÄRT & BELEGT)" else "${currFmt.format(difference)} (LÜCKE VORHANDEN)"
+        val statusText = if (abs(difference) < 0.01) "0,00 € (VOLLSTÄNDIG NACHVOLLZIEHBAR)" else "${currFmt.format(difference)} (NOCH OFFEN)"
         canvas.drawText("• Verbleibende Differenz: $statusText", 50f, 170f, paint)
 
         // Abhebungen
@@ -803,38 +841,41 @@ private fun generateAndShareReconciliationReport(
             yPos += 14f
         }
         cashTx.forEach { tx ->
-            val typeLabel = if (tx.type == CashTransactionType.PRIVATE_WITHDRAWAL) "[Privatentnahme]" else "[Barausgabe]"
+            val typeLabel = if (tx.type == CashTransactionType.PRIVATE_WITHDRAWAL) "[Eigenbedarf]" else "[Barausgabe]"
             canvas.drawText("• ${df.format(Date(tx.date))} | $typeLabel ${tx.title.take(25)} | ${currFmt.format(tx.amount)}", 50f, yPos, paint)
             yPos += 14f
         }
 
-        // Bescheinigung für Steuerberater
+        // Bestätigungsvermerk
         yPos += 25f
         paint.textSize = 11f
         paint.isFakeBoldText = true
-        canvas.drawText("4. Erklärung & Bestätigungsvermerk für den Steuerberater", 40f, yPos, paint)
+        canvas.drawText("4. Persönliche Notizen & Freigabe", 40f, yPos, paint)
 
         yPos += 18f
         paint.textSize = 9f
         paint.isFakeBoldText = false
-        canvas.drawText("Hiermit wird bestätigt, dass die oben aufgeführten Barbelege und Bargeldabhebungen", 40f, yPos, paint)
+        canvas.drawText("Zusammenstellung aller Belege und Ausgaben für den Monat $monthLabel", 40f, yPos, paint)
         yPos += 12f
-        canvas.drawText("für den Monat $monthLabel vollständig erfasst und abgeglichen wurden.", 40f, yPos, paint)
+        canvas.drawText("zur lückenlosen Dokumentation und Finanzübersicht.", 40f, yPos, paint)
 
         yPos += 40f
         canvas.drawLine(40f, yPos, 220f, yPos, paint)
         canvas.drawLine(340f, yPos, 520f, yPos, paint)
         yPos += 12f
-        canvas.drawText("Datum, Unterschrift Mandant", 40f, yPos, paint)
-        canvas.drawText("Geprüft Steuerberater / Buchhaltung", 340f, yPos, paint)
+        canvas.drawText("Datum, Unterschrift", 40f, yPos, paint)
+        canvas.drawText("Geprüft & Archiviert", 340f, yPos, paint)
 
         pdfDocument.finishPage(page)
 
         val reportFile = File(context.cacheDir, "myDocAnizer_Monatsabgleich_${monthLabel.replace(" ", "_")}.pdf")
-        val outputStream = FileOutputStream(reportFile)
-        pdfDocument.writeTo(outputStream)
-        pdfDocument.close()
-        outputStream.close()
+        try {
+            FileOutputStream(reportFile).use { outputStream ->
+                pdfDocument.writeTo(outputStream)
+            }
+        } finally {
+            pdfDocument.close()
+        }
 
         val uri: Uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", reportFile)
         val shareIntent = Intent(Intent.ACTION_SEND).apply {
@@ -843,7 +884,14 @@ private fun generateAndShareReconciliationReport(
             putExtra(Intent.EXTRA_SUBJECT, "myDocAnizer Kassen- & Belegabgleich $monthLabel")
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
-        context.startActivity(Intent.createChooser(shareIntent, "Prüfbericht teilen"))
+        val chooser = Intent.createChooser(shareIntent, "Prüfbericht teilen").apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        try {
+            context.startActivity(chooser)
+        } catch (e: Exception) {
+            Toast.makeText(context, "Keine passende App zum Teilen gefunden", Toast.LENGTH_SHORT).show()
+        }
     } catch (e: Exception) {
         Toast.makeText(context, "Fehler beim Erstellen des Prüfberichts: ${e.message}", Toast.LENGTH_LONG).show()
     }

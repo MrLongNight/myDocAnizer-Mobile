@@ -76,7 +76,6 @@ class ExampleRobolectricTest {
     viewModel.setEnableReceiptExpenses(true)
     viewModel.setEnableBankStatementImport(true)
     viewModel.setEnableMonthlyReconciliation(true)
-    viewModel.setReconciliationToleranceDays(7)
     viewModel.setNotifyReconciliationDiscrepancies(true)
 
     assertEquals(true, viewModel.enableIncomeExpenseTracking.first())
@@ -84,7 +83,6 @@ class ExampleRobolectricTest {
     assertEquals(true, viewModel.enableReceiptExpenses.first())
     assertEquals(true, viewModel.enableBankStatementImport.first())
     assertEquals(true, viewModel.enableMonthlyReconciliation.first())
-    assertEquals(7, viewModel.reconciliationToleranceDays.first())
     assertEquals(true, viewModel.notifyReconciliationDiscrepancies.first())
   }
 
@@ -93,19 +91,25 @@ class ExampleRobolectricTest {
     val app = ApplicationProvider.getApplicationContext<Application>()
     val viewModel = DocAnizerViewModel(app)
 
+    viewModel.setShowBelegQuickScanWidget(true)
+    viewModel.setShowCashTrackerWidget(true)
     viewModel.setShowKpiWidgets(true)
     viewModel.setShowDeadlinesWidget(true)
     viewModel.setShowFinanceWidget(true)
     viewModel.setShowReconciliationWidget(true)
     viewModel.setShowCategoryDistributionWidget(true)
     viewModel.setShowSecurityScoreWidget(true)
+    viewModel.setShowCustomFieldsWidget(true)
 
+    assertEquals(true, viewModel.showBelegQuickScanWidget.first())
+    assertEquals(true, viewModel.showCashTrackerWidget.first())
     assertEquals(true, viewModel.showKpiWidgets.first())
     assertEquals(true, viewModel.showDeadlinesWidget.first())
     assertEquals(true, viewModel.showFinanceWidget.first())
     assertEquals(true, viewModel.showReconciliationWidget.first())
     assertEquals(true, viewModel.showCategoryDistributionWidget.first())
     assertEquals(true, viewModel.showSecurityScoreWidget.first())
+    assertEquals(true, viewModel.showCustomFieldsWidget.first())
   }
 
   @Test
@@ -173,5 +177,146 @@ class ExampleRobolectricTest {
     val dao = AppDatabase.getDatabase(app).customFieldDao()
     val list = dao.getAllCustomFieldsList().filter { it.name.trim().equals("Eindeutiger Belegstatus", ignoreCase = true) }
     assertEquals(1, list.size)
+  }
+
+  @Test
+  fun `verify BankStatementParserService parses German CSV and detects cash withdrawals`() = runBlocking {
+    val sampleCsv = """
+      Auftragskonto;Buchungstag;Valutadatum;Buchungstext;Verwendungszweck;Beguenstigter;Betrag;Waehrung
+      DE1234567890;15.09.2026;15.09.2026;Auszahlung Geldautomat;GA-Barauszahlung Sparkasse Filiale;Sparkasse;-250,00;EUR
+      DE1234567890;18.09.2026;18.09.2026;Kartenzahlung;Supermarkt Einkauf;EDEKA;-34,50;EUR
+      DE1234567890;25.09.2026;25.09.2026;Überweisung;Gehalt September 2026;Arbeitgeber GmbH;2800,00;EUR
+    """.trimIndent()
+
+    val parseResult = com.example.service.BankStatementParserService.parseCsvOrText(sampleCsv, "sparkasse_export.csv")
+    assertEquals(3, parseResult.totalParsed)
+    assertEquals(1, parseResult.cashWithdrawalsCount)
+    assertEquals(250.0, parseResult.totalCashWithdrawalsAmount, 0.001)
+    assertTrue(parseResult.detectedBankFormat.contains("Sparkasse"))
+
+    val cashEntry = parseResult.entries.first { it.isCashWithdrawal }
+    assertEquals(-250.0, cashEntry.amount, 0.001)
+    assertEquals("2026-09", cashEntry.monthYear)
+
+    val app = ApplicationProvider.getApplicationContext<Application>()
+    val viewModel = DocAnizerViewModel(app)
+
+    val inserted1 = viewModel.importBankStatementEntriesSync(parseResult.entries)
+    assertEquals(3, inserted1)
+
+    val insertedAgain = viewModel.importBankStatementEntriesSync(parseResult.entries)
+    assertEquals(0, insertedAgain)
+  }
+
+  @Test
+  fun `verify DeadlineDetectionService parses contract deadlines and due dates`() = runBlocking {
+    val sampleText = """
+      Sehr geehrter Kunde,
+      vielen Dank für Ihren Mobilfunkvertrag bei Vodafone.
+      Ihre Mindestvertragslaufzeit bis: 31.12.2026.
+      Sie können spätestens kündbar bis zum 30.11.2026 kündigen.
+      Der offene Rechnungsbetrag ist zahlbar bis zum 15.10.2026.
+    """.trimIndent()
+
+    val deadlines = com.example.service.DeadlineDetectionService.detectDeadlines(sampleText)
+    assertTrue(deadlines.isNotEmpty())
+
+    val cancellation = deadlines.firstOrNull { it.type == com.example.service.DeadlineType.CANCELLATION }
+    assertNotNull(cancellation)
+    assertEquals("30.11.2026", cancellation?.formattedDate)
+
+    val contractEnd = deadlines.firstOrNull { it.type == com.example.service.DeadlineType.CONTRACT_END }
+    assertNotNull(contractEnd)
+    assertEquals("31.12.2026", contractEnd?.formattedDate)
+
+    val payment = deadlines.firstOrNull { it.type == com.example.service.DeadlineType.PAYMENT_DUE }
+    assertNotNull(payment)
+    assertEquals("15.10.2026", payment?.formattedDate)
+
+    val (primaryCancel, primaryEnd) = com.example.service.DeadlineDetectionService.extractPrimaryDeadlines(sampleText)
+    assertNotNull(primaryCancel)
+    assertNotNull(primaryEnd)
+  }
+
+  @Test
+  fun `verify Custom Dashboard Widgets and Reordering flow`() = runBlocking {
+    val app = ApplicationProvider.getApplicationContext<Application>()
+    val viewModel = DocAnizerViewModel(app)
+
+    // 1. Initial State: Quick scan and cash tracker must be false by default
+    val freshSettings = com.example.service.SettingsRepository(app)
+    assertEquals(false, freshSettings.showBelegQuickScanWidget.first())
+    assertEquals(false, freshSettings.showCashTrackerWidget.first())
+
+    // 2. Create custom widget
+    val customWidget = com.example.model.CustomDashboardWidget(
+      id = "custom_test_1",
+      title = "Garantie-Belege",
+      subtitle = "Meine Rechnungen mit Garantie",
+      type = com.example.model.CustomDashboardWidgetType.TAG_FILTER,
+      targetTag = "#garantie",
+      colorSkin = "EMERALD"
+    )
+
+    viewModel.addCustomDashboardWidget(customWidget)
+    val widgetsAfterAdd = viewModel.customDashboardWidgets.first()
+    assertEquals(1, widgetsAfterAdd.size)
+    assertEquals("Garantie-Belege", widgetsAfterAdd[0].title)
+    assertEquals("#garantie", widgetsAfterAdd[0].targetTag)
+
+    // 3. Update custom widget checklist & note
+    val checklistItems = listOf(
+      com.example.model.ChecklistItem(id = "item_1", text = "Rechnung ablegen", isDone = false),
+      com.example.model.ChecklistItem(id = "item_2", text = "Seriennummer notieren", isDone = true)
+    )
+    viewModel.updateCustomWidgetChecklist("custom_test_1", checklistItems)
+    viewModel.updateCustomWidgetNote("custom_test_1", "Garantie gilt 24 Monate")
+
+    val updatedWidgets = viewModel.customDashboardWidgets.first()
+    assertEquals(2, updatedWidgets[0].checklistItems.size)
+    assertEquals(true, updatedWidgets[0].checklistItems[1].isDone)
+    assertEquals("Garantie gilt 24 Monate", updatedWidgets[0].noteText)
+
+    // 4. Test reordering
+    viewModel.moveDashboardWidgetUp("custom_test_1")
+    val order = viewModel.dashboardWidgetOrder.first()
+    assertTrue(order.contains("custom_test_1"))
+
+    // 5. Delete custom widget
+    viewModel.deleteCustomDashboardWidget("custom_test_1")
+    val widgetsAfterDelete = viewModel.customDashboardWidgets.first()
+    assertTrue(widgetsAfterDelete.isEmpty())
+
+    // 6. Test per-element Period Scope settings & filtering
+    viewModel.setElementPeriodScope("STANDARD_KPI", com.example.model.ElementPeriodScope.MONTH)
+    val scopes = viewModel.elementPeriodScopes.first()
+    assertEquals(com.example.model.ElementPeriodScope.MONTH, scopes["STANDARD_KPI"])
+
+    val now = System.currentTimeMillis()
+    val testDocs = listOf(
+      com.example.model.DocumentEntity(
+        id = 1L,
+        title = "Beleg Heute",
+        sender = "EDEKA",
+        fileName = "beleg_heute.pdf",
+        filePath = "/path/1.pdf",
+        mainCategory = "Finanzen",
+        subCategory = "Einkauf",
+        createdAt = now
+      ),
+      com.example.model.DocumentEntity(
+        id = 2L,
+        title = "Beleg Alt",
+        sender = "REWE",
+        fileName = "beleg_alt.pdf",
+        filePath = "/path/2.pdf",
+        mainCategory = "Finanzen",
+        subCategory = "Einkauf",
+        createdAt = now - 400L * 24 * 60 * 60 * 1000
+      )
+    )
+    val filteredYear = com.example.model.ElementPeriodScope.YEAR.filterDocuments(testDocs, now)
+    assertEquals(1, filteredYear.size)
+    assertEquals(1L, filteredYear[0].id)
   }
 }

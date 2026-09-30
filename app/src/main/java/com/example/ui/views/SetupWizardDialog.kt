@@ -859,7 +859,7 @@ private fun StepViewModeAndRestore(
  * - Bargeld Tracker (Geldbörse & Barkasse)
  * - Ein-/Ausgaben & Beleg Erfassung (Kassenbons, Rechnungen, OCR)
  * - Kontoauszüge importieren (PDF/CSV)
- * - Automatischer monatlicher Datenabgleich (Reconciliation für Steuerberater & Beleglücken)
+ * - Automatischer monatlicher Datenabgleich (Bargeld- & Beleg-Check / Selbstkontrolle)
  */
 @Composable
 private fun StepIncomeExpenseConfig(
@@ -870,7 +870,6 @@ private fun StepIncomeExpenseConfig(
     val enableReceiptExpenses by viewModel.enableReceiptExpenses.collectAsState()
     val enableBankStatementImport by viewModel.enableBankStatementImport.collectAsState()
     val enableMonthlyReconciliation by viewModel.enableMonthlyReconciliation.collectAsState()
-    val toleranceDays by viewModel.reconciliationToleranceDays.collectAsState()
     val notifyDiscrepancies by viewModel.notifyReconciliationDiscrepancies.collectAsState()
 
     val allThreeActive = enableCashTracker && enableReceiptExpenses && enableBankStatementImport
@@ -1121,7 +1120,7 @@ private fun StepIncomeExpenseConfig(
                                     )
                                     Column {
                                         Text(
-                                            text = "Automatischer monatlicher Datenabgleich",
+                                            text = "Ausgaben- & Beleg-Check",
                                             style = MaterialTheme.typography.bodyMedium,
                                             fontWeight = FontWeight.Bold
                                         )
@@ -1130,7 +1129,7 @@ private fun StepIncomeExpenseConfig(
                                             color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.15f)
                                         ) {
                                             Text(
-                                                text = "FÜR STEUERBERATER & BELEG-LÜCKENPRÜFUNG",
+                                                text = "BARGELD & QUITTUNGEN",
                                                 style = MaterialTheme.typography.labelSmall,
                                                 fontWeight = FontWeight.Bold,
                                                 color = MaterialTheme.colorScheme.tertiary,
@@ -1147,7 +1146,7 @@ private fun StepIncomeExpenseConfig(
                             }
 
                             Text(
-                                text = "Gleicht deine Bargeld-Abhebungen vom Kontoauszug (z. B. Geldautomat 200 €) automatisch mit den manuell erfassten Bar-Belegen ab. So werden eventuelle Lücken und vergessene Quittungen sofort sichtbar, damit Steuererklärung und Buchhaltung zu 100% lückenlos und nachvollziehbar belegt sind.",
+                                text = "Gleicht deine Bargeld-Abhebungen vom Kontoauszug (z. B. Geldautomat 200 €) automatisch mit den manuell erfassten Bar-Belegen und Barausgaben ab. Ideal für alle, die häufig mit Bargeld bezahlen: Erkenne sofort vergessene Quittungen, sieh wofür dein Geld ausgegeben wurde und entdecke Sparpotenziale.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -1162,12 +1161,12 @@ private fun StepIncomeExpenseConfig(
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(
-                                            text = "Lücken- & Differenzhinweise",
+                                            text = "Hinweis bei unklaren Bargeldausgaben",
                                             style = MaterialTheme.typography.labelLarge,
                                             fontWeight = FontWeight.SemiBold
                                         )
                                         Text(
-                                            text = "Am Monatsende warnen, falls Barabhebungen und Belege abweichen.",
+                                            text = "Am Monatsende benachrichtigen, wenn Barabhebungen und Belege voneinander abweichen.",
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
@@ -1176,34 +1175,6 @@ private fun StepIncomeExpenseConfig(
                                         checked = notifyDiscrepancies,
                                         onCheckedChange = { viewModel.setNotifyReconciliationDiscrepancies(it) }
                                     )
-                                }
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = "Toleranzfenster für Zuordnung",
-                                            style = MaterialTheme.typography.labelLarge,
-                                            fontWeight = FontWeight.SemiBold
-                                        )
-                                        Text(
-                                            text = "Max. $toleranceDays Tage Differenz zwischen Abhebung und Belegdatum",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                        listOf(3, 5, 7).forEach { days ->
-                                            FilterChip(
-                                                selected = toleranceDays == days,
-                                                onClick = { viewModel.setReconciliationToleranceDays(days) },
-                                                label = { Text("${days}T") }
-                                            )
-                                        }
-                                    }
                                 }
                             }
                         }
@@ -4465,9 +4436,9 @@ private fun StepReadySummary(
                     }
                     Text("• Status: Aktiv (${modules.joinToString(", ").ifEmpty { "Keine Module aktiv" }})", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     if (enableMonthlyReconciliation) {
-                        Text("• Automatischer Monatsabgleich: Aktiviert (Lückenprüfung für Steuerberater)", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                        Text("• Ausgaben- & Beleg-Check: Aktiviert (Selbstkontrolle für Bargeld & Quittungen)", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                     } else {
-                        Text("• Automatischer Monatsabgleich: Deaktiviert", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("• Ausgaben- & Beleg-Check: Deaktiviert", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 } else {
                     Text("• Status: Deaktiviert (kann jederzeit in den Einstellungen aktiviert werden)", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

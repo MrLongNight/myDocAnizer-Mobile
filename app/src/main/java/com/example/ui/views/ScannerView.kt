@@ -49,6 +49,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.core.content.ContextCompat
 import com.example.model.DocTypeItem
 import com.example.model.DocumentEntity
@@ -74,17 +75,17 @@ fun ScannerView(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val selectedTemplate by viewModel.selectedTemplate.collectAsState()
-    val isColorMode by viewModel.isColorMode.collectAsState()
-    val capturedPages by viewModel.capturedPages.collectAsState()
-    val isProcessing by viewModel.isProcessingScan.collectAsState()
-    val templates by viewModel.templates.collectAsState()
-    val docTypes by viewModel.docTypes.collectAsState()
-    val scannerSettings by viewModel.scannerSettings.collectAsState()
-    val lastBulkSavedDoc by viewModel.lastBulkSavedDoc.collectAsState()
-    val batchQueue by viewModel.batchQueue.collectAsState()
-    val isBatchModeActive by viewModel.isBatchModeActive.collectAsState()
-    val pendingRuleSuggestion by viewModel.pendingRuleSuggestion.collectAsState()
+    val selectedTemplate by viewModel.selectedTemplate.collectAsStateWithLifecycle()
+    val isColorMode by viewModel.isColorMode.collectAsStateWithLifecycle()
+    val capturedPages by viewModel.capturedPages.collectAsStateWithLifecycle()
+    val isProcessing by viewModel.isProcessingScan.collectAsStateWithLifecycle()
+    val templates by viewModel.templates.collectAsStateWithLifecycle()
+    val docTypes by viewModel.docTypes.collectAsStateWithLifecycle()
+    val scannerSettings by viewModel.scannerSettings.collectAsStateWithLifecycle()
+    val lastBulkSavedDoc by viewModel.lastBulkSavedDoc.collectAsStateWithLifecycle()
+    val batchQueue by viewModel.batchQueue.collectAsStateWithLifecycle()
+    val isBatchModeActive by viewModel.isBatchModeActive.collectAsStateWithLifecycle()
+    val pendingRuleSuggestion by viewModel.pendingRuleSuggestion.collectAsStateWithLifecycle()
 
     var showTemplateModal by remember { mutableStateOf(false) }
     var flashOption by remember(scannerSettings.flashMode) {
@@ -213,8 +214,14 @@ fun ScannerView(
                     ContextCompat.getMainExecutor(context),
                     object : ImageCapture.OnImageCapturedCallback() {
                         override fun onCaptureSuccess(imageProxy: ImageProxy) {
-                            val bmp = imageProxyToBitmap(imageProxy)
-                            imageProxy.close()
+                            val bmp = try {
+                                imageProxyToBitmap(imageProxy)
+                            } catch (t: Throwable) {
+                                Log.e("ScannerView", "Fehler beim Dekodieren des ImageProxy: ${t.message}", t)
+                                null
+                            } finally {
+                                imageProxy.close()
+                            }
                             if (bmp != null) {
                                 onBmpReady(bmp)
                             } else {
@@ -543,11 +550,17 @@ fun ScannerView(
                     Spacer(modifier = Modifier.height(8.dp))
                     OutlinedButton(
                         onClick = {
-                            val intent = Intent(
-                                android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                                android.net.Uri.fromParts("package", context.packageName, null)
-                            )
-                            context.startActivity(intent)
+                            try {
+                                val intent = Intent(
+                                    android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                    android.net.Uri.fromParts("package", context.packageName, null)
+                                ).apply {
+                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                }
+                                context.startActivity(intent)
+                            } catch (e: Exception) {
+                                Log.e("ScannerView", "Einstellungen konnten nicht geöffnet werden: ${e.message}")
+                            }
                         },
                         modifier = Modifier.fillMaxWidth()
                     ) {

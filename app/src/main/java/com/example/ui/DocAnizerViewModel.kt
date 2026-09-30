@@ -60,13 +60,16 @@ class DocAnizerViewModel(application: Application) : AndroidViewModel(applicatio
     val enableMonthlyReconciliation: StateFlow<Boolean> = settingsRepo.enableMonthlyReconciliation
     fun setEnableMonthlyReconciliation(enabled: Boolean) = settingsRepo.setEnableMonthlyReconciliation(enabled)
 
-    val reconciliationToleranceDays: StateFlow<Int> = settingsRepo.reconciliationToleranceDays
-    fun setReconciliationToleranceDays(days: Int) = settingsRepo.setReconciliationToleranceDays(days)
-
     val notifyReconciliationDiscrepancies: StateFlow<Boolean> = settingsRepo.notifyReconciliationDiscrepancies
     fun setNotifyReconciliationDiscrepancies(enabled: Boolean) = settingsRepo.setNotifyReconciliationDiscrepancies(enabled)
 
     // Dashboard anpassbare Widgets
+    val showBelegQuickScanWidget: StateFlow<Boolean> = settingsRepo.showBelegQuickScanWidget
+    fun setShowBelegQuickScanWidget(show: Boolean) = settingsRepo.setShowBelegQuickScanWidget(show)
+
+    val showCashTrackerWidget: StateFlow<Boolean> = settingsRepo.showCashTrackerWidget
+    fun setShowCashTrackerWidget(show: Boolean) = settingsRepo.setShowCashTrackerWidget(show)
+
     val showKpiWidgets: StateFlow<Boolean> = settingsRepo.showKpiWidgets
     fun setShowKpiWidgets(show: Boolean) = settingsRepo.setShowKpiWidgets(show)
 
@@ -84,6 +87,69 @@ class DocAnizerViewModel(application: Application) : AndroidViewModel(applicatio
 
     val showSecurityScoreWidget: StateFlow<Boolean> = settingsRepo.showSecurityScoreWidget
     fun setShowSecurityScoreWidget(show: Boolean) = settingsRepo.setShowSecurityScoreWidget(show)
+
+    val showCustomFieldsWidget: StateFlow<Boolean> = settingsRepo.showCustomFieldsWidget
+    fun setShowCustomFieldsWidget(show: Boolean) = settingsRepo.setShowCustomFieldsWidget(show)
+
+    val showRecentDocsWidget: StateFlow<Boolean> = settingsRepo.showRecentDocsWidget
+    fun setShowRecentDocsWidget(show: Boolean) = settingsRepo.setShowRecentDocsWidget(show)
+
+    val showFolderShortcutsWidget: StateFlow<Boolean> = settingsRepo.showFolderShortcutsWidget
+    fun setShowFolderShortcutsWidget(show: Boolean) = settingsRepo.setShowFolderShortcutsWidget(show)
+
+    val showInboxDocsWidget: StateFlow<Boolean> = settingsRepo.showInboxDocsWidget
+    fun setShowInboxDocsWidget(show: Boolean) = settingsRepo.setShowInboxDocsWidget(show)
+
+    val showBudgetWatchWidget: StateFlow<Boolean> = settingsRepo.showBudgetWatchWidget
+    fun setShowBudgetWatchWidget(show: Boolean) = settingsRepo.setShowBudgetWatchWidget(show)
+
+    val showQuickActionsWidget: StateFlow<Boolean> = settingsRepo.showQuickActionsWidget
+    fun setShowQuickActionsWidget(show: Boolean) = settingsRepo.setShowQuickActionsWidget(show)
+
+    val showQuickNoteWidget: StateFlow<Boolean> = settingsRepo.showQuickNoteWidget
+    fun setShowQuickNoteWidget(show: Boolean) = settingsRepo.setShowQuickNoteWidget(show)
+
+    val quickNoteText: StateFlow<String> = settingsRepo.quickNoteText
+    fun setQuickNoteText(text: String) = settingsRepo.setQuickNoteText(text)
+
+    // Individuelle Dashboard-Elemente & Sortierung
+    val customDashboardWidgets: StateFlow<List<com.example.model.CustomDashboardWidget>> = settingsRepo.customDashboardWidgets
+    fun addCustomDashboardWidget(widget: com.example.model.CustomDashboardWidget) = settingsRepo.addCustomWidget(widget)
+    fun updateCustomDashboardWidget(widget: com.example.model.CustomDashboardWidget) = settingsRepo.updateCustomWidget(widget)
+    fun deleteCustomDashboardWidget(id: String) = settingsRepo.deleteCustomWidget(id)
+    fun toggleCustomDashboardWidget(id: String, enabled: Boolean) = settingsRepo.toggleCustomWidget(id, enabled)
+    fun updateCustomWidgetChecklist(id: String, items: List<com.example.model.ChecklistItem>) = settingsRepo.updateCustomWidgetChecklist(id, items)
+    fun updateCustomWidgetNote(id: String, text: String) = settingsRepo.updateCustomWidgetNote(id, text)
+
+    val dashboardWidgetOrder: StateFlow<List<String>> = settingsRepo.dashboardWidgetOrder
+    fun setDashboardWidgetOrder(order: List<String>) = settingsRepo.setDashboardWidgetOrder(order)
+    fun moveDashboardWidgetUp(widgetId: String) = settingsRepo.moveWidgetUp(widgetId)
+    fun moveDashboardWidgetDown(widgetId: String) = settingsRepo.moveWidgetDown(widgetId)
+    fun resetDashboardWidgetOrder() = settingsRepo.resetWidgetOrder()
+
+    // Element-spezifische Zeitraum-Scopes
+    val elementPeriodScopes: StateFlow<Map<String, com.example.model.ElementPeriodScope>> = settingsRepo.elementPeriodScopes
+    fun getElementPeriodScope(elementId: String, default: com.example.model.ElementPeriodScope = com.example.model.ElementPeriodScope.ALL): com.example.model.ElementPeriodScope = settingsRepo.getElementPeriodScope(elementId, default)
+    fun setElementPeriodScope(elementId: String, scope: com.example.model.ElementPeriodScope) = settingsRepo.setElementPeriodScope(elementId, scope)
+
+    // Homescreen Widget Intent Triggers
+    private val _targetNavigationTab = MutableStateFlow<String?>(null)
+    val targetNavigationTab: StateFlow<String?> = _targetNavigationTab.asStateFlow()
+    fun setTargetNavigationTab(tab: String?) {
+        _targetNavigationTab.value = tab
+    }
+
+    private val _directOpenCashTracker = MutableStateFlow(false)
+    val directOpenCashTracker: StateFlow<Boolean> = _directOpenCashTracker.asStateFlow()
+    fun setDirectOpenCashTracker(open: Boolean) {
+        _directOpenCashTracker.value = open
+    }
+
+    private val _directOpenReconciliation = MutableStateFlow(false)
+    val directOpenReconciliation: StateFlow<Boolean> = _directOpenReconciliation.asStateFlow()
+    fun setDirectOpenReconciliation(open: Boolean) {
+        _directOpenReconciliation.value = open
+    }
 
     // Bargeld-Transaktionen & Kontoauszüge
     val cashTransactions: StateFlow<List<com.example.model.CashTransactionEntity>> = financeDao.getAllCashTransactions()
@@ -110,9 +176,35 @@ class DocAnizerViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    fun importBankStatementEntries(entries: List<com.example.model.BankStatementEntryEntity>) {
+    suspend fun importBankStatementEntriesSync(entries: List<com.example.model.BankStatementEntryEntity>): Int {
+        val existing = financeDao.getAllBankStatementEntriesList()
+        val existingKeys = existing.map { "${it.date}_${it.amount}_${it.bookingText.trim().lowercase()}" }.toSet()
+        val newEntries = entries.filter {
+            val key = "${it.date}_${it.amount}_${it.bookingText.trim().lowercase()}"
+            !existingKeys.contains(key)
+        }
+        if (newEntries.isNotEmpty()) {
+            financeDao.insertBankStatementEntries(newEntries)
+        }
+        return newEntries.size
+    }
+
+    fun importBankStatementEntries(entries: List<com.example.model.BankStatementEntryEntity>, onComplete: ((Int) -> Unit)? = null) {
         viewModelScope.launch(Dispatchers.IO) {
-            financeDao.insertBankStatementEntries(entries)
+            val insertedCount = importBankStatementEntriesSync(entries)
+            withContext(Dispatchers.Main) {
+                onComplete?.invoke(insertedCount)
+            }
+        }
+    }
+
+    fun importDemoBankStatement(monthKey: String, onComplete: ((Int) -> Unit)? = null) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val demoEntries = com.example.service.BankStatementParserService.generateDemoStatement(monthKey)
+            val insertedCount = importBankStatementEntriesSync(demoEntries)
+            withContext(Dispatchers.Main) {
+                onComplete?.invoke(insertedCount)
+            }
         }
     }
 
@@ -587,9 +679,22 @@ class DocAnizerViewModel(application: Application) : AndroidViewModel(applicatio
                             updateBatchItem(updated)
                         }
                         processedCount++
+                    } catch (t: Throwable) {
+                        Log.e("DocAnizerViewModel", "Fehler bei Stapelverarbeitung von Element ${item.id}: ${t.message}", t)
+                        val errorItem = item.copy(
+                            status = com.example.model.BatchItemStatus.ERROR,
+                            aiReasoning = "Verarbeitung fehlgeschlagen: ${t.localizedMessage ?: "Unbekannter Fehler"}"
+                        )
+                        updateBatchItem(errorItem)
                     } finally {
                         bitmap.recycle()
                     }
+                } else {
+                    val errorItem = item.copy(
+                        status = com.example.model.BatchItemStatus.ERROR,
+                        aiReasoning = "Bilddatei konnte nicht geladen oder dekodiert werden"
+                    )
+                    updateBatchItem(errorItem)
                 }
             }
 
@@ -931,6 +1036,33 @@ class DocAnizerViewModel(application: Application) : AndroidViewModel(applicatio
         settingsRepo.addSubFolder(mainFolderIdOrName, name, prefixId)
     }
 
+    fun updateFolderIconAndLogo(
+        mainCatNameOrId: String,
+        subCatNameOrId: String? = null,
+        iconName: String,
+        companyLogo: String,
+        customLogoUri: String = ""
+    ) {
+        settingsRepo.updateFolderIconAndLogo(
+            mainFolderId = mainCatNameOrId,
+            subFolderId = subCatNameOrId,
+            iconName = iconName,
+            companyLogo = companyLogo,
+            customLogoUri = customLogoUri
+        )
+    }
+
+    fun updateDocumentIconAndLogo(
+        documentId: Long,
+        customIcon: String,
+        companyLogo: String
+    ) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val doc = documentDao.getDocumentById(documentId) ?: return@launch
+            documentDao.updateDocument(doc.copy(customIcon = customIcon, companyLogo = companyLogo))
+        }
+    }
+
     fun renameMainFolder(oldName: String, newName: String) {
         val cleanNewName = newName.trim()
         if (cleanNewName.isBlank() || oldName == cleanNewName) return
@@ -1043,7 +1175,9 @@ class DocAnizerViewModel(application: Application) : AndroidViewModel(applicatio
         val subCategory: String? = null,
         val dateRange: String = "ALL", // "ALL", "TODAY", "WEEK", "MONTH", "YEAR"
         val pageFilter: String = "ALL", // "ALL", "SINGLE", "MULTI", "3_PLUS", "5_PLUS"
-        val sortBy: String = "DATE_DESC" // "DATE_DESC", "DATE_ASC", "TITLE_ASC", "TITLE_DESC", "PAGES_DESC"
+        val sortBy: String = "DATE_DESC", // "DATE_DESC", "DATE_ASC", "TITLE_ASC", "TITLE_DESC", "PAGES_DESC"
+        val customFieldId: String? = null,
+        val customFieldValue: String? = null
     )
 
     private val _filter = MutableStateFlow(ExplorerFilter())
@@ -1070,6 +1204,10 @@ class DocAnizerViewModel(application: Application) : AndroidViewModel(applicatio
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "ALL")
     val filterSortBy: StateFlow<String> = _filter.map { it.sortBy }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "DATE_DESC")
+    val filterCustomFieldId: StateFlow<String?> = _filter.map { it.customFieldId }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+    val filterCustomFieldValue: StateFlow<String?> = _filter.map { it.customFieldValue }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     // Zähler aktiver Filter für Badge auf dem Filter-Button
     val activeFilterCount: StateFlow<Int> = _filter.map { f ->
@@ -1081,14 +1219,16 @@ class DocAnizerViewModel(application: Application) : AndroidViewModel(applicatio
         if (f.pageFilter != "ALL") count++
         if (f.tag != null) count++
         if (f.sender.isNotBlank()) count++
+        if (f.customFieldId != null) count++
         count
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
     // Gefilterte Dokumente für DocAnizer
     val filteredDocuments: StateFlow<List<DocumentEntity>> = combine(
         allDocuments,
+        allDocumentCustomFieldValues,
         _filter
-    ) { docs, f ->
+    ) { docs, customVals, f ->
         val now = System.currentTimeMillis()
         val cal = java.util.Calendar.getInstance()
 
@@ -1168,7 +1308,20 @@ class DocAnizerViewModel(application: Application) : AndroidViewModel(applicatio
                 else -> true
             }
 
-            matchesQuery && matchesSender && matchesDocType && matchesTag && matchesMainCat && matchesSubCat && matchesDate && matchesPageCount
+            // 9. Zusatzfelder Filter
+            val matchesCustomField = when {
+                f.customFieldId == null -> true
+                else -> {
+                    val matchingVals = customVals.filter { it.documentId == doc.id && it.customFieldId == f.customFieldId }
+                    if (f.customFieldValue.isNullOrBlank()) {
+                        matchingVals.isNotEmpty() && matchingVals.any { it.fieldValue.isNotBlank() }
+                    } else {
+                        matchingVals.any { it.fieldValue.contains(f.customFieldValue, ignoreCase = true) }
+                    }
+                }
+            }
+
+            matchesQuery && matchesSender && matchesDocType && matchesTag && matchesMainCat && matchesSubCat && matchesDate && matchesPageCount && matchesCustomField
         }.let { list ->
             when (f.sortBy) {
                 "DATE_ASC" -> list.sortedBy { it.createdAt }
@@ -1353,6 +1506,10 @@ class DocAnizerViewModel(application: Application) : AndroidViewModel(applicatio
         _filter.value = _filter.value.copy(pageFilter = pageFilter)
     }
 
+    fun setFilterCustomField(fieldId: String?, value: String? = null) {
+        _filter.value = _filter.value.copy(customFieldId = fieldId, customFieldValue = value)
+    }
+
     fun setSortBy(sortBy: String) {
         _filter.value = _filter.value.copy(sortBy = sortBy)
     }
@@ -1369,7 +1526,9 @@ class DocAnizerViewModel(application: Application) : AndroidViewModel(applicatio
             mainCategory = null,
             subCategory = null,
             dateRange = "ALL",
-            pageFilter = "ALL"
+            pageFilter = "ALL",
+            customFieldId = null,
+            customFieldValue = null
         )
     }
 
@@ -1617,6 +1776,9 @@ class DocAnizerViewModel(application: Application) : AndroidViewModel(applicatio
                     settings = pdfSettings.value
                 )
 
+                // Fristen-Erkennung ausführen
+                val (detectedCancellation, detectedContractEnd) = com.example.service.DeadlineDetectionService.extractPrimaryDeadlines(ocrText)
+
                 // 6. In Room-Datenbank speichern
                 val entity = DocumentEntity(
                     title = title,
@@ -1634,7 +1796,9 @@ class DocAnizerViewModel(application: Application) : AndroidViewModel(applicatio
                     pageCount = processedPages.size,
                     fileSizeFormatted = "${(targetPdfFile.length() / 1024).coerceAtLeast(35)} KB",
                     isEncrypted = true,
-                    isSynced = false
+                    isSynced = false,
+                    cancellationDeadline = detectedCancellation,
+                    contractEndDate = detectedContractEnd
                 )
 
                 val newId = documentDao.insertDocument(entity)
@@ -1712,6 +1876,8 @@ class DocAnizerViewModel(application: Application) : AndroidViewModel(applicatio
                         .take(3)
                         .map { it.lowercase() }
 
+                    val (suggestedIcon, suggestedLogo) = com.example.ui.components.detectSuggestedLogoAndIcon(aiClass.sender, ocrText, aiClass.mainCategoryId)
+
                     val suggestedRule = com.example.model.DocRule(
                         name = aiClass.title.ifBlank { "Scan ${aiClass.sender}" },
                         matchKeywords = suggestedKeywords.ifEmpty { listOf(aiClass.sender.lowercase()) },
@@ -1720,7 +1886,10 @@ class DocAnizerViewModel(application: Application) : AndroidViewModel(applicatio
                         targetDocType = aiClass.docType,
                         detectedSender = aiClass.sender,
                         targetTags = aiClass.tags,
-                        isAiGenerated = true
+                        isEnabled = true,
+                        isAiGenerated = true,
+                        targetIcon = suggestedIcon,
+                        targetLogo = suggestedLogo
                     )
 
                     _isProcessingScan.value = false
@@ -1811,6 +1980,12 @@ class DocAnizerViewModel(application: Application) : AndroidViewModel(applicatio
                     settings = pdfSettings.value
                 )
 
+                val (detectedCancellation, detectedContractEnd) = com.example.service.DeadlineDetectionService.extractPrimaryDeadlines(ocrText)
+
+                val (autoIcon, autoLogo) = com.example.ui.components.detectSuggestedLogoAndIcon(sender, ocrText, template.mainCategory)
+                val finalIcon = rule.targetIcon.ifBlank { autoIcon }
+                val finalLogo = rule.targetLogo.ifBlank { autoLogo }
+
                 val entity = DocumentEntity(
                     title = title,
                     sender = sender,
@@ -1827,7 +2002,11 @@ class DocAnizerViewModel(application: Application) : AndroidViewModel(applicatio
                     pageCount = 1,
                     fileSizeFormatted = "${(targetPdfFile.length() / 1024).coerceAtLeast(35)} KB",
                     isEncrypted = true,
-                    isSynced = false
+                    isSynced = false,
+                    cancellationDeadline = detectedCancellation,
+                    contractEndDate = detectedContractEnd,
+                    customIcon = finalIcon,
+                    companyLogo = finalLogo
                 )
 
                 val newId = documentDao.insertDocument(entity)
@@ -2056,6 +2235,8 @@ class DocAnizerViewModel(application: Application) : AndroidViewModel(applicatio
                     settings = pdfSettings.value
                 )
 
+                val (detectedCancellation, detectedContractEnd) = com.example.service.DeadlineDetectionService.extractPrimaryDeadlines(ocrText)
+
                 val entity = DocumentEntity(
                     title = safeTitle,
                     sender = safeSender,
@@ -2072,7 +2253,9 @@ class DocAnizerViewModel(application: Application) : AndroidViewModel(applicatio
                     pageCount = 1,
                     fileSizeFormatted = "${(targetPdfFile.length() / 1024).coerceAtLeast(30)} KB",
                     isEncrypted = true,
-                    isSynced = false
+                    isSynced = false,
+                    cancellationDeadline = detectedCancellation,
+                    contractEndDate = detectedContractEnd
                 )
 
                 val newId = documentDao.insertDocument(entity)

@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">myDocAnizer-Mobile</string>
+    <string name="widget_quick_scan_description">Beleg Quick-Scan Direktstart für den Homescreen</string>
+    <string name="widget_bargeld_tracker_description">Bargeld Tracker Schnell-Erfassung für den Homescreen</string>
 </resources>

@@ -497,9 +497,18 @@ object DocumentStorageService {
 
     fun deriveKey(password: String, salt: ByteArray): SecretKeySpec {
         val factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
-        val spec = PBEKeySpec(password.toCharArray(), salt, PBKDF2_ITERATIONS, KEY_LENGTH_BITS)
-        val secretKey = factory.generateSecret(spec)
-        return SecretKeySpec(secretKey.encoded, "AES")
+        val passwordChars = password.toCharArray()
+        val spec = PBEKeySpec(passwordChars, salt, PBKDF2_ITERATIONS, KEY_LENGTH_BITS)
+        try {
+            val secretKey = factory.generateSecret(spec)
+            val keyBytes = secretKey.encoded
+            val keySpec = SecretKeySpec(keyBytes, "AES")
+            keyBytes.fill(0)
+            return keySpec
+        } finally {
+            spec.clearPassword()
+            passwordChars.fill('\u0000')
+        }
     }
 
     /**
@@ -526,16 +535,20 @@ object DocumentStorageService {
 
             FileInputStream(inputFile).use { fis ->
                 val buffer = ByteArray(64 * 1024)
-                var bytesRead: Int
-                while (fis.read(buffer).also { bytesRead = it } != -1) {
-                    val outputChunk = cipher.update(buffer, 0, bytesRead)
-                    if (outputChunk != null && outputChunk.isNotEmpty()) {
-                        fos.write(outputChunk)
+                try {
+                    var bytesRead: Int
+                    while (fis.read(buffer).also { bytesRead = it } != -1) {
+                        val outputChunk = cipher.update(buffer, 0, bytesRead)
+                        if (outputChunk != null && outputChunk.isNotEmpty()) {
+                            fos.write(outputChunk)
+                        }
                     }
-                }
-                val finalChunk = cipher.doFinal()
-                if (finalChunk != null && finalChunk.isNotEmpty()) {
-                    fos.write(finalChunk)
+                    val finalChunk = cipher.doFinal()
+                    if (finalChunk != null && finalChunk.isNotEmpty()) {
+                        fos.write(finalChunk)
+                    }
+                } finally {
+                    buffer.fill(0)
                 }
             }
         }
@@ -576,16 +589,20 @@ object DocumentStorageService {
                 outputFile.parentFile?.mkdirs()
                 FileOutputStream(outputFile).use { fos ->
                     val buffer = ByteArray(64 * 1024)
-                    var bytesRead: Int
-                    while (fis.read(buffer).also { bytesRead = it } != -1) {
-                        val outputChunk = cipher.update(buffer, 0, bytesRead)
-                        if (outputChunk != null && outputChunk.isNotEmpty()) {
-                            fos.write(outputChunk)
+                    try {
+                        var bytesRead: Int
+                        while (fis.read(buffer).also { bytesRead = it } != -1) {
+                            val outputChunk = cipher.update(buffer, 0, bytesRead)
+                            if (outputChunk != null && outputChunk.isNotEmpty()) {
+                                fos.write(outputChunk)
+                            }
                         }
-                    }
-                    val finalChunk = cipher.doFinal()
-                    if (finalChunk != null && finalChunk.isNotEmpty()) {
-                        fos.write(finalChunk)
+                        val finalChunk = cipher.doFinal()
+                        if (finalChunk != null && finalChunk.isNotEmpty()) {
+                            fos.write(finalChunk)
+                        }
+                    } finally {
+                        buffer.fill(0)
                     }
                 }
             }

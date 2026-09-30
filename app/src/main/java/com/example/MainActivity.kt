@@ -1,5 +1,6 @@
 package com.example
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.KeyEvent
 import androidx.activity.compose.setContent
@@ -9,12 +10,12 @@ import androidx.fragment.app.FragmentActivity
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.ui.DocAnizerViewModel
 import com.example.ui.components.AppStartSplashAnimation
 import com.example.ui.theme.MyApplicationTheme
@@ -25,11 +26,12 @@ class MainActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        handleWidgetIntent(intent)
         enableEdgeToEdge()
         setContent {
-            val themeMode by viewModel.themeMode.collectAsState()
-            val colorSkin by viewModel.colorSkin.collectAsState()
-            val highContrastMode by viewModel.highContrastMode.collectAsState()
+            val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
+            val colorSkin by viewModel.colorSkin.collectAsStateWithLifecycle()
+            val highContrastMode by viewModel.highContrastMode.collectAsStateWithLifecycle()
             val systemDark = isSystemInDarkTheme()
             val isDark = when (themeMode) {
                 "DARK" -> true
@@ -71,5 +73,25 @@ class MainActivity : FragmentActivity() {
             }
         }
         return super.onKeyDown(keyCode, event)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleWidgetIntent(intent)
+    }
+
+    private fun handleWidgetIntent(intent: Intent?) {
+        if (intent == null) return
+        val targetTab = intent.getStringExtra("EXTRA_START_TAB")
+        if (!targetTab.isNullOrBlank()) {
+            viewModel.setTargetNavigationTab(targetTab)
+        }
+        val action = intent.getStringExtra("EXTRA_OPEN_ACTION")
+        if (action == "CASH_EXPENSE") {
+            viewModel.setDirectOpenCashTracker(true)
+        }
+        if (intent.getBooleanExtra("EXTRA_OPEN_RECONCILIATION", false)) {
+            viewModel.setDirectOpenReconciliation(true)
+        }
     }
 }

@@ -433,6 +433,7 @@ class LlmService(private val context: Context) {
             val generatedList = mutableListOf<DocRule>()
 
             if (descLower.contains("vodafone") || descLower.contains("mobilfunk") || descLower.contains("handy") || descLower.contains("telefon")) {
+                val (icon, logo) = com.example.ui.components.detectSuggestedLogoAndIcon("Vodafone", userDescription, "Verträge")
                 generatedList.add(
                     DocRule(
                         id = UUID.randomUUID().toString(),
@@ -445,12 +446,36 @@ class LlmService(private val context: Context) {
                         detectedSender = "Vodafone GmbH",
                         targetTags = listOf("#mobilfunk", "#vodafone", "#fixkosten"),
                         isEnabled = true,
-                        isAiGenerated = true
+                        isAiGenerated = true,
+                        targetIcon = icon,
+                        targetLogo = logo.ifBlank { "vodafone" }
                     )
                 )
             }
 
-            if (descLower.contains("strom") || descLower.contains("stadtwerke") || descLower.contains("gas") || descLower.contains("energie") || descLower.contains("vattenfall")) {
+            if (descLower.contains("telekom") || descLower.contains("magenta") || descLower.contains("t-mobile")) {
+                val (icon, logo) = com.example.ui.components.detectSuggestedLogoAndIcon("Telekom", userDescription, "Verträge")
+                generatedList.add(
+                    DocRule(
+                        id = UUID.randomUUID().toString(),
+                        name = "Telekom Festnetz & Mobilfunk",
+                        matchKeywords = listOf("telekom", "rechnung online", "buchungskonto"),
+                        excludeKeywords = listOf("werbung"),
+                        targetMainCategoryId = "A02",
+                        targetSubCategoryId = "B2.01",
+                        targetDocType = "Rechnung",
+                        detectedSender = "Deutsche Telekom",
+                        targetTags = listOf("#telekom", "#internet", "#fixkosten"),
+                        isEnabled = true,
+                        isAiGenerated = true,
+                        targetIcon = icon,
+                        targetLogo = logo.ifBlank { "telekom" }
+                    )
+                )
+            }
+
+            if (descLower.contains("strom") || descLower.contains("stadtwerke") || descLower.contains("gas") || descLower.contains("energie") || descLower.contains("vattenfall") || descLower.contains("eon")) {
+                val (icon, logo) = com.example.ui.components.detectSuggestedLogoAndIcon("Stadtwerke", userDescription, "Finanzen")
                 generatedList.add(
                     DocRule(
                         id = UUID.randomUUID().toString(),
@@ -463,12 +488,15 @@ class LlmService(private val context: Context) {
                         detectedSender = "Stadtwerke",
                         targetTags = listOf("#strom", "#energie", "#stadtwerke"),
                         isEnabled = true,
-                        isAiGenerated = true
+                        isAiGenerated = true,
+                        targetIcon = icon.ifBlank { "bolt" },
+                        targetLogo = logo
                     )
                 )
             }
 
-            if (descLower.contains("allianz") || descLower.contains("versicherung") || descLower.contains("huk") || descLower.contains("haftpflicht") || descLower.contains("auto")) {
+            if (descLower.contains("allianz") || descLower.contains("versicherung") || descLower.contains("huk") || descLower.contains("haftpflicht") || descLower.contains("auto") || descLower.contains("ergo")) {
+                val (icon, logo) = com.example.ui.components.detectSuggestedLogoAndIcon("Versicherung", userDescription, "Versicherungen")
                 generatedList.add(
                     DocRule(
                         id = UUID.randomUUID().toString(),
@@ -481,12 +509,36 @@ class LlmService(private val context: Context) {
                         detectedSender = "Versicherung",
                         targetTags = listOf("#versicherung", "#police"),
                         isEnabled = true,
-                        isAiGenerated = true
+                        isAiGenerated = true,
+                        targetIcon = icon.ifBlank { "shield" },
+                        targetLogo = logo
+                    )
+                )
+            }
+
+            if (descLower.contains("bank") || descLower.contains("sparkasse") || descLower.contains("konto") || descLower.contains("ing") || descLower.contains("gehalt")) {
+                val (icon, logo) = com.example.ui.components.detectSuggestedLogoAndIcon("Bank", userDescription, "Finanzen")
+                generatedList.add(
+                    DocRule(
+                        id = UUID.randomUUID().toString(),
+                        name = "Bankkonto / Kontoauszug",
+                        matchKeywords = listOf("kontoauszug", "kontostand", "iban", "saldo"),
+                        excludeKeywords = emptyList(),
+                        targetMainCategoryId = "A03",
+                        targetSubCategoryId = "B3.01",
+                        targetDocType = "Kontoauszug",
+                        detectedSender = "Bank",
+                        targetTags = listOf("#finanzen", "#bank"),
+                        isEnabled = true,
+                        isAiGenerated = true,
+                        targetIcon = icon.ifBlank { "bank" },
+                        targetLogo = logo
                     )
                 )
             }
 
             if (descLower.contains("miete") || descLower.contains("wohnung") || descLower.contains("vermieter") || descLower.contains("nebenkosten")) {
+                val (icon, logo) = com.example.ui.components.detectSuggestedLogoAndIcon("Vermieter", userDescription, "Wohnung")
                 generatedList.add(
                     DocRule(
                         id = UUID.randomUUID().toString(),
@@ -499,7 +551,9 @@ class LlmService(private val context: Context) {
                         detectedSender = "Vermieter",
                         targetTags = listOf("#wohnung", "#miete", "#nebenkosten"),
                         isEnabled = true,
-                        isAiGenerated = true
+                        isAiGenerated = true,
+                        targetIcon = icon.ifBlank { "home" },
+                        targetLogo = logo
                     )
                 )
             }
@@ -512,6 +566,9 @@ class LlmService(private val context: Context) {
                     .take(3)
 
                 val ruleName = userDescription.take(35).replace("\n", " ")
+                val detectedSender = cleanWords.firstOrNull()?.replaceFirstChar { it.uppercase() } ?: "Absender"
+                val (icon, logo) = com.example.ui.components.detectSuggestedLogoAndIcon(detectedSender, userDescription, "Allgemein")
+
                 generatedList.add(
                     DocRule(
                         id = UUID.randomUUID().toString(),
@@ -521,10 +578,12 @@ class LlmService(private val context: Context) {
                         targetMainCategoryId = "A01",
                         targetSubCategoryId = "B1.01",
                         targetDocType = "Rechnung",
-                        detectedSender = cleanWords.firstOrNull()?.replaceFirstChar { it.uppercase() } ?: "Absender",
+                        detectedSender = detectedSender,
                         targetTags = listOf("#dokument"),
                         isEnabled = true,
-                        isAiGenerated = true
+                        isAiGenerated = true,
+                        targetIcon = icon,
+                        targetLogo = logo
                     )
                 )
             }
