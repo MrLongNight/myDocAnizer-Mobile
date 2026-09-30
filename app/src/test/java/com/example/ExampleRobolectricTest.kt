@@ -319,4 +319,28 @@ class ExampleRobolectricTest {
     assertEquals(1, filteredYear.size)
     assertEquals(1L, filteredYear[0].id)
   }
+
+  @Test
+  fun `verify extended HuggingFace models and catalog sync flow`() = runBlocking {
+    val app = ApplicationProvider.getApplicationContext<Application>()
+    val viewModel = DocAnizerViewModel(app)
+
+    val models = viewModel.availableModels.first()
+    assertTrue(models.any { it.id == "deepseek-r1-distill-qwen-1.5b" })
+    assertTrue(models.any { it.id == "phi-3.5-mini-instruct" })
+    assertTrue(models.any { it.id == "ministral-3b-instruct" })
+    assertTrue(models.any { it.id == "qwen2.5-coder-1.5b" })
+
+    val deepSeek = models.first { it.id == "deepseek-r1-distill-qwen-1.5b" }
+    assertEquals("Reasoning & Logik", deepSeek.modelCategory)
+    assertTrue(deepSeek.isCuratedApproved)
+
+    // Test Catalog Sync
+    viewModel.syncModelCatalogFromRemote(forceCheck = true)
+    // Wait briefly or check flow
+    val notif = viewModel.newModelsNotification.first()
+    // Test dismiss
+    viewModel.dismissNewModelsNotification()
+    assertEquals(null, viewModel.newModelsNotification.value)
+  }
 }

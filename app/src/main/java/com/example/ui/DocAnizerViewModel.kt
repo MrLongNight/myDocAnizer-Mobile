@@ -447,6 +447,9 @@ class DocAnizerViewModel(application: Application) : AndroidViewModel(applicatio
     val isGeneratingAi: StateFlow<Boolean> = llmService.isGenerating
     val deviceHardwareInfo: StateFlow<com.example.model.DeviceHardwareInfo> = llmService.deviceHardware
     val llmInferenceConfig: StateFlow<com.example.model.LlmInferenceConfig> = settingsRepo.llmInferenceConfig
+    val isCheckingNewModels: StateFlow<Boolean> = llmService.isCheckingNewModels
+    val newModelsNotification: StateFlow<String?> = llmService.newModelsNotification
+    val lastCatalogSync: StateFlow<Long> = llmService.lastCatalogSync
 
     fun selectModel(modelId: String) = llmService.selectModel(modelId)
     fun downloadModel(modelId: String, onProgress: (Float) -> Unit = {}) {
@@ -457,6 +460,12 @@ class DocAnizerViewModel(application: Application) : AndroidViewModel(applicatio
     fun setLlmTemperature(temp: Float) = updateLlmInferenceConfig(llmInferenceConfig.value.copy(temperature = temp))
     fun setSystemPromptPreset(preset: String) = updateLlmInferenceConfig(llmInferenceConfig.value.copy(systemPromptFocus = preset))
     fun setLlmCpuThreads(threads: Int) = updateLlmInferenceConfig(llmInferenceConfig.value.copy(threadCount = threads))
+    fun dismissNewModelsNotification() = llmService.dismissNewModelsNotification()
+    fun syncModelCatalogFromRemote(forceCheck: Boolean = true) {
+        viewModelScope.launch {
+            llmService.syncModelCatalogFromRemote(forceCheck)
+        }
+    }
 
     // First-Run Wizard & Manueller Start
     val isWizardCompleted: StateFlow<Boolean> = settingsRepo.isWizardCompleted

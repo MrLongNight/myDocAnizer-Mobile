@@ -372,14 +372,19 @@ fun HuggingFaceModelsContent(
     val hardwareInfo by viewModel.deviceHardwareInfo.collectAsState()
     val inferenceConfig by viewModel.llmInferenceConfig.collectAsState()
     val isExpertMode by viewModel.isExpertMode.collectAsState()
+    val isCheckingNewModels by viewModel.isCheckingNewModels.collectAsState()
+    val newModelsNotification by viewModel.newModelsNotification.collectAsState()
     var isAdvancedInferenceExpanded by remember { mutableStateOf(false) }
     var onlyShowCompatible by remember { mutableStateOf(true) }
+    var selectedCategoryFilter by remember { mutableStateOf("Alle") }
 
-    val displayedModels = remember(models, onlyShowCompatible, hardwareInfo) {
-        if (onlyShowCompatible && hardwareInfo.totalRamGb > 0) {
-            models.filter { it.recommendedRamGb <= hardwareInfo.totalRamGb + 0.5f }
-        } else {
-            models
+    val displayedModels = remember(models, onlyShowCompatible, hardwareInfo, selectedCategoryFilter) {
+        models.filter { model ->
+            val matchHardware = if (onlyShowCompatible && hardwareInfo.totalRamGb > 0) {
+                model.recommendedRamGb <= hardwareInfo.totalRamGb + 0.5f
+            } else true
+            val matchCategory = if (selectedCategoryFilter == "Alle") true else model.modelCategory == selectedCategoryFilter
+            matchHardware && matchCategory
         }
     }
 
@@ -388,6 +393,36 @@ fun HuggingFaceModelsContent(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
+        // NOTIFICATION BANNER BEI NEUEN MODELLEN
+        newModelsNotification?.let { notifText ->
+            item {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
+                ) {
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Celebration, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = notifText,
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                            TextButton(onClick = { viewModel.dismissNewModelsNotification() }) {
+                                Text("Schließen", style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // INFO HEADER
         item {
             Surface(
@@ -615,13 +650,59 @@ fun HuggingFaceModelsContent(
             }
         }
 
-        // MODELLE LISTE HEADER
+        // MODELLE LISTE HEADER & SYNC ACTION
         item {
-            Text(
-                text = "HuggingFace Modelle (${displayedModels.size} verfügbar):",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "HuggingFace Modelle (${displayedModels.size} verfügbar):",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Geprüfte, quantisierte GGUF-Modelle für On-Device Inferenz",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    FilledTonalButton(
+                        onClick = { viewModel.syncModelCatalogFromRemote(forceCheck = true) },
+                        enabled = !isCheckingNewModels,
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                        modifier = Modifier.testTag("btn_sync_model_catalog")
+                    ) {
+                        if (isCheckingNewModels) {
+                            CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Prüfe...", fontSize = 11.sp)
+                        } else {
+                            Icon(Icons.Default.CloudSync, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Katalog prüfen", fontSize = 11.sp)
+                        }
+                    }
+                }
+
+                // KATEGORIE-FILTER CHIPS
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    listOf("Alle", "Reasoning & Logik", "Verträge & Jura", "Finanzen & Tabellen", "Mehrsprachig").forEach { cat ->
+                        FilterChip(
+                            selected = selectedCategoryFilter == cat,
+                            onClick = { selectedCategoryFilter = cat },
+                            label = { Text(cat, fontSize = 11.sp) }
+                        )
+                    }
+                }
+            }
         }
 
         items(displayedModels, key = { it.id }) { model ->
@@ -637,7 +718,7 @@ fun HuggingFaceModelsContent(
                 modifier = Modifier.fillMaxWidth().testTag("model_card_${model.id}")
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    // Kopfzeile mit Name, Aktiv-Status & RAM-Badge
+                    // Kopfzeile mit Name, Aktiv-Status, Neu-Badge & RAM-Badge
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -653,6 +734,20 @@ fun HuggingFaceModelsContent(
                                     fontWeight = FontWeight.Bold,
                                     style = MaterialTheme.typography.titleMedium
                                 )
+                                if (model.isNewRelease) {
+                                    Surface(
+                                        shape = RoundedCornerShape(4.dp),
+                                        color = MaterialTheme.colorScheme.tertiary
+                                    ) {
+                                        Text(
+                                            text = "NEU",
+                                            color = MaterialTheme.colorScheme.onTertiary,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                        )
+                                    }
+                                }
                                 if (model.isSelected) {
                                     Surface(
                                         shape = RoundedCornerShape(4.dp),
@@ -667,11 +762,22 @@ fun HuggingFaceModelsContent(
                                     }
                                 }
                             }
-                            Text(
-                                text = "Entwickler: ${model.author} • Format: ${model.quantFormat}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text(
+                                    text = "Entwickler: ${model.author} • ${model.modelCategory}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = "• ✓ ${model.approvalStatus}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
                         }
 
                         // Dynamic Compatibility Badge
