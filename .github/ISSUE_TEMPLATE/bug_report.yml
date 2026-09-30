@@ -1,0 +1,110 @@
+# .github/ISSUE_TEMPLATE/bug_report.yml
+name: 🐛 Bug Report
+description: Melde einen Fehler oder Problem
+title: "[BUG] "
+labels: ["bug", "needs-triage"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        # 🐛 Bug Report
+        Danke, dass du einen Fehler meldest! Bitte fülle so viele Details wie möglich aus.
+
+  - type: textarea
+    attributes:
+      label: "Fehlerbeschreibung"
+      description: "Was ist das Problem? Sei so detailliert wie möglich."
+      placeholder: "Der App stürzt ab, wenn ich..."
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: "Schritte zum Reproduzieren"
+      description: "Wie kann man den Fehler reproduzieren?"
+      placeholder: |
+        1. Öffne die App
+        2. Navigiere zu [Bereich]
+        3. Führe folgende Aktion durch: [...]
+        4. Beobachte: [Fehler]
+      value: |
+        1. 
+        2. 
+        3. 
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: "Erwartetes Verhalten"
+      description: "Was sollte stattdessen passieren?"
+      placeholder: "Die App sollte..."
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: "Aktuelles Verhalten"
+      description: "Was passiert tatsächlich?"
+      placeholder: "Die App zeigt einen Fehler / stürzt ab / funktioniert nicht..."
+    validations:
+      required: true
+
+  - type: input
+    attributes:
+      label: "Android Version"
+      description: "Welche Android Version läuft auf deinem Gerät?"
+      placeholder: "z.B. Android 12 (API 31), Android 14 (API 34)"
+    validations:
+      required: true
+
+  - type: input
+    attributes:
+      label: "Gerät/Modell"
+      description: "Welches Smartphone/Tablet verwendest du?"
+      placeholder: "z.B. Pixel 6, Samsung Galaxy S23, OnePlus 11"
+    validations:
+      required: true
+
+  - type: input
+    attributes:
+      label: "App Version"
+      description: "Welche Version der App nutzt du?"
+      placeholder: "z.B. 1.0.0 (Build 001)"
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: "Logs / Stack Trace"
+      description: "Poste die Fehlerausgabe aus Logcat (falls vorhanden)"
+      render: kotlin
+      placeholder: |
+        E/AndroidRuntime: FATAL EXCEPTION: main
+        Process: com.aistudio.mydocanizer.app, PID: 1234
+        ...
+
+  - type: textarea
+    attributes:
+      label: "Screenshots / Videos"
+      description: "Füge Screenshots oder Videos ein, die das Problem zeigen"
+      placeholder: "Paste image or video here"
+
+  - type: textarea
+    attributes:
+      label: "Zusätzlicher Kontext"
+      description: "Gibt es noch etwas Wichtiges?"
+      placeholder: "z.B. funktioniert es nur mit bestimmten Dokumenttypen, nur offline, etc."
+
+  - type: checkboxes
+    attributes:
+      label: "Checkliste"
+      description: "Bitte bestätige folgende Punkte:"
+      options:
+        - label: "Ich habe nach ähnlichen Issues gesucht"
+          required: true
+        - label: "Ich nutze die neueste Version der App"
+          required: true
+        - label: "Ich kann den Fehler reproduzieren"
+          required: true
