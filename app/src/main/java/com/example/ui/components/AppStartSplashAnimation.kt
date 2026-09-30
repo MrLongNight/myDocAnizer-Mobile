@@ -256,43 +256,44 @@ object SplashSoundSynthesizer {
     }
 
     fun playPremiumSplashSound(context: Context? = null) {
-        stop() // Laufenden Ton sofort beenden
-
-        val file = synchronized(lock) {
-            val ctx = context ?: appContext
-            if (wavFile == null && ctx != null) {
-                val f = File(ctx.cacheDir, "splash_sound_v6.wav")
-                if (!f.exists()) {
-                    try {
-                        val data = generateSamples()
-                        writeWavFile(f, data)
-                    } catch (_: Throwable) {}
-                }
-                wavFile = f
-            }
-            wavFile
-        }
-
-        if (file == null || !file.exists()) return
-
+        val ctx = context?.applicationContext ?: appContext ?: return
         Thread {
             try {
-                val mp = MediaPlayer().apply {
-                    setDataSource(file.absolutePath)
-                    setAudioAttributes(
-                        AudioAttributes.Builder()
-                            .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
-                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                            .build()
-                    )
-                    prepare()
-                    start()
+                stop() // Laufenden Ton sofort beenden
+
+                val file = synchronized(lock) {
+                    var f = wavFile
+                    if (f == null || !f.exists()) {
+                        f = File(ctx.cacheDir, "splash_sound_v6.wav")
+                        if (!f.exists()) {
+                            try {
+                                val data = generateSamples()
+                                writeWavFile(f, data)
+                            } catch (_: Throwable) {}
+                        }
+                        wavFile = f
+                    }
+                    f
                 }
-                synchronized(lock) {
-                    mediaPlayer = mp
+
+                if (file != null && file.exists()) {
+                    val mp = MediaPlayer().apply {
+                        setDataSource(file.absolutePath)
+                        setAudioAttributes(
+                            AudioAttributes.Builder()
+                                .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+                                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                                .build()
+                        )
+                        prepare()
+                        start()
+                    }
+                    synchronized(lock) {
+                        mediaPlayer = mp
+                    }
                 }
-            } catch (e: Throwable) {
-                e.printStackTrace()
+            } catch (_: Throwable) {
+                // Audio-Wiedergabe ist optional und blockiert niemals den Start
             }
         }.start()
     }
@@ -313,13 +314,12 @@ object SplashSoundSynthesizer {
 }
 
 /**
- * Überarbeitete, edle 4.0-Sekunden High-Fidelity App-Start-Animation.
+ * Überarbeitete, edle 1.2-Sekunden High-Fidelity App-Start-Animation.
  * - Kontinuierlicher 0-100% Ladebalken & System-Telemetrie.
  * - Neon-Laser Scanner, orbital rotierende Cyber-Partikel.
  * - Dynamisches Hologramm-Logo (slow scale-up & floating 3D-rotation).
  * - Visueller Schockwellen-Impuls bei 82.5% Fortschritt, exakt synchron zum Audio-Chime!
- * - Untermalt mit professionellem, rein synthetisch generiertem Audio-Ablauf.
- * - Jederzeit durch Tippen sofort überspringbar.
+ * - Garantiert abbruchsicher mit 1.5s Fallback-Timeout und Überspringen-Button.
  */
 @Composable
 fun AppStartSplashAnimation(
@@ -327,16 +327,16 @@ fun AppStartSplashAnimation(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val totalDurationMs = 4000 // Dauer auf 4.0 Sekunden erhöht für edle Wirkung
+    val totalDurationMs = 1200 // Angenehme, flotte 1.2 Sekunden für perfekten App-Start
     val progressAnim = remember { Animatable(0f) }
     val infiniteTransition = rememberInfiniteTransition(label = "splash_infinite")
 
-    // Endlose Hilfs-Rotationen für Partikel & Scan-Pulse während der 4.0s
+    // Endlose Hilfs-Rotationen für Partikel & Scan-Pulse während des Starts
     val particleAngle by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 360f,
         animationSpec = infiniteRepeatable(
-            animation = tween(4000, easing = LinearEasing),
+            animation = tween(2000, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
         label = "particle_rotation"
@@ -346,7 +346,7 @@ fun AppStartSplashAnimation(
         initialValue = -90f,
         targetValue = 90f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1900, easing = FastOutSlowInEasing),
+            animation = tween(1200, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "laser_scan"
@@ -356,28 +356,37 @@ fun AppStartSplashAnimation(
         initialValue = 0.98f,
         targetValue = 1.03f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1200, easing = FastOutSlowInEasing),
+            animation = tween(800, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "pulse_scale"
     )
 
     // Abbruchsicherer Finish-Handler, der auch das Audio augenblicklich stoppt
+    var isFinished by remember { mutableStateOf(false) }
     val safeFinish = {
-        SplashSoundSynthesizer.stop()
-        onAnimationFinished()
+        if (!isFinished) {
+            isFinished = true
+            SplashSoundSynthesizer.stop()
+            onAnimationFinished()
+        }
     }
 
     LaunchedEffect(Unit) {
-        // Starte die edle Sound-Synthese (latenzfrei durch Audio-Streaming)
-        SplashSoundSynthesizer.playPremiumSplashSound(context)
+        try {
+            // Starte Sound asynchron (ohne UI-Thread zu blockieren)
+            SplashSoundSynthesizer.playPremiumSplashSound(context)
 
-        // Kontinuierlicher Ablauf der grafischen Timeline
-        progressAnim.animateTo(
-            targetValue = 1f,
-            animationSpec = tween(durationMillis = totalDurationMs, easing = LinearEasing)
-        )
-        safeFinish()
+            // Feste Maximaldauer mit Fallback-Garantie
+            kotlinx.coroutines.withTimeoutOrNull(1500L) {
+                progressAnim.animateTo(
+                    targetValue = 1f,
+                    animationSpec = tween(durationMillis = totalDurationMs, easing = LinearEasing)
+                )
+            }
+        } finally {
+            safeFinish()
+        }
     }
 
     val progress = progressAnim.value

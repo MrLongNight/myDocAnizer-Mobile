@@ -133,6 +133,12 @@ dependencies {
   androidTestImplementation(libs.androidx.runner)
   debugImplementation(libs.androidx.compose.ui.test.manifest)
   debugImplementation(libs.androidx.compose.ui.tooling)
-  "ksp"(libs.androidx.room.compiler)
+  kspDebug(libs.androidx.room.compiler)
+  kspRelease(libs.androidx.room.compiler)
   // "ksp"(libs.moshi.kotlin.codegen)
+}
+
+// Disable unnecessary KSP execution for unit/instrumented tests to prevent AWT EventQueue IntelliJ service NPEs
+tasks.matching { it.name.startsWith("ksp") && (it.name.contains("UnitTest") || it.name.contains("AndroidTest")) }.configureEach {
+  enabled = false
 }
