@@ -1,6 +1,7 @@
 package com.example.ui.views
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -30,6 +31,26 @@ fun PendingRuleSuggestionDialog(
     var keywordsStr by remember { mutableStateOf(suggestion.suggestedRule.matchKeywords.joinToString(", ")) }
     var mainCatId by remember { mutableStateOf(suggestion.suggestedRule.targetMainCategoryId) }
     var subCatId by remember { mutableStateOf(suggestion.suggestedRule.targetSubCategoryId) }
+    var selectedIcon by remember { mutableStateOf(suggestion.suggestedRule.targetIcon.ifBlank { "description" }) }
+    var selectedLogo by remember { mutableStateOf(suggestion.suggestedRule.targetLogo) }
+    var showIconPicker by remember { mutableStateOf(false) }
+
+    if (showIconPicker) {
+        com.example.ui.components.UniversalIconAndLogoPickerDialog(
+            title = "Ziel-Icon & Firmenlogo",
+            subtitle = ruleName,
+            currentIcon = selectedIcon,
+            currentLogo = selectedLogo,
+            currentCustomLogoUri = "",
+            isFolder = false,
+            onSave = { icon, logo, _ ->
+                selectedIcon = icon
+                selectedLogo = logo
+                showIconPicker = false
+            },
+            onDismiss = { showIconPicker = false }
+        )
+    }
 
     Dialog(onDismissRequest = { suggestion.onDismiss() }) {
         Surface(
@@ -47,35 +68,61 @@ fun PendingRuleSuggestionDialog(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                // Titelzeile mit KI-Icon
+                // Titelzeile mit KI-Icon & Live-Vorschau des Ziel-Icons
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Surface(
-                        shape = RoundedCornerShape(10.dp),
-                        color = MaterialTheme.colorScheme.primaryContainer,
-                        modifier = Modifier.size(40.dp)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.weight(1f)
                     ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.Default.AutoAwesome,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            modifier = Modifier.size(40.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.AutoAwesome,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                        Column {
+                            Text(
+                                text = "Neuer KI-Regelvorschlag",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Keine bestehende Regel hat gematcht",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
-                    Column {
-                        Text(
-                            text = "Neuer KI-Regelvorschlag",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "Keine bestehende Regel hat gematcht",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+
+                    // Live-Vorschau des zugewiesenen Icons
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clickable { showIconPicker = true }
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            com.example.ui.components.DocumentOrFolderIcon(
+                                iconName = selectedIcon,
+                                companyLogo = selectedLogo,
+                                isFolder = false,
+                                size = 44.dp
+                            )
+                        }
                     }
                 }
 
@@ -86,7 +133,7 @@ fun PendingRuleSuggestionDialog(
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Text(
-                            text = "Die KI hat den OCR-Text analysiert und folgenden Vorschlag für Ablage und Regel erarbeitet. Du kannst ihn anpassen und entscheiden, ob diese Regel dauerhaft gespeichert oder nur einmalig angewendet wird.",
+                            text = "Die KI hat den OCR-Text analysiert und folgenden Vorschlag für Ablage und Regel erarbeitet. Du kannst ihn anpassen und entscheiden, ob diese Regel dauerhaft gespeichert oder nur einmalig angewendet wird. Tippe rechts oben auf das Symbol, um Icon & Logo anzupassen.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -102,13 +149,27 @@ fun PendingRuleSuggestionDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                OutlinedTextField(
-                    value = sender,
-                    onValueChange = { sender = it },
-                    label = { Text("Erkannter Absender") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = sender,
+                        onValueChange = { sender = it },
+                        label = { Text("Erkannter Absender") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
+                    )
+                    OutlinedButton(
+                        onClick = { showIconPicker = true },
+                        modifier = Modifier.height(52.dp)
+                    ) {
+                        Icon(Icons.Default.Category, contentDescription = null)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Logo/Icon")
+                    }
+                }
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -150,13 +211,15 @@ fun PendingRuleSuggestionDialog(
                             val kwList = keywordsStr.split(",")
                                 .map { it.trim().lowercase() }
                                 .filter { it.isNotEmpty() }
-                            val updatedRule = suggestion.suggestedRule.copy(
+                             val updatedRule = suggestion.suggestedRule.copy(
                                 name = ruleName.ifBlank { "Scan $sender" },
                                 detectedSender = sender.ifBlank { "Unbekannt" },
                                 targetDocType = docType,
                                 targetMainCategoryId = mainCatId,
                                 targetSubCategoryId = subCatId,
-                                matchKeywords = if (kwList.isNotEmpty()) kwList else listOf(sender.lowercase())
+                                matchKeywords = if (kwList.isNotEmpty()) kwList else listOf(sender.lowercase()),
+                                targetIcon = selectedIcon,
+                                targetLogo = selectedLogo
                             )
                             suggestion.onSaveAsPermanentRule(updatedRule)
                         },
@@ -172,7 +235,21 @@ fun PendingRuleSuggestionDialog(
 
                     OutlinedButton(
                         onClick = {
-                            suggestion.onSingleUseOnly()
+                            val kwList = keywordsStr.split(",")
+                                .map { it.trim().lowercase() }
+                                .filter { it.isNotEmpty() }
+                            val updatedRule = suggestion.suggestedRule.copy(
+                                name = ruleName.ifBlank { "Scan $sender" },
+                                detectedSender = sender.ifBlank { "Unbekannt" },
+                                targetDocType = docType,
+                                targetMainCategoryId = mainCatId,
+                                targetSubCategoryId = subCatId,
+                                matchKeywords = if (kwList.isNotEmpty()) kwList else listOf(sender.lowercase()),
+                                targetIcon = selectedIcon,
+                                targetLogo = selectedLogo
+                            )
+                            // We can use updatedRule for single use too so the created DocumentEntity receives the customized Icon and Logo!
+                            suggestion.onSaveAsPermanentRule(updatedRule)
                         },
                         modifier = Modifier
                             .fillMaxWidth()

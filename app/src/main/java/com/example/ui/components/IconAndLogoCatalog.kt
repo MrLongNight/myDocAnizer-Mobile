@@ -85,7 +85,6 @@ import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.FolderSpecial
 import androidx.compose.material.icons.filled.Gavel
-import androidx.compose.material.icons.filled.GraduationCap
 import androidx.compose.material.icons.filled.Healing
 import androidx.compose.material.icons.filled.HealthAndSafety
 import androidx.compose.material.icons.filled.Help

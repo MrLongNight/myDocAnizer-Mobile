@@ -87,6 +87,7 @@ fun DmsExplorerView(
     val trashRetentionDays by viewModel.trashRetentionDays.collectAsStateWithLifecycle()
     val calendarIntegrationMode by viewModel.calendarIntegrationMode.collectAsStateWithLifecycle()
     val chatMessages by viewModel.chatMessages.collectAsStateWithLifecycle()
+    val foldersHierarchy by viewModel.folders.collectAsStateWithLifecycle()
 
     val customFields by viewModel.customFields.collectAsStateWithLifecycle()
     val allCustomFieldValues by viewModel.allDocumentCustomFieldValues.collectAsStateWithLifecycle()
@@ -102,6 +103,7 @@ fun DmsExplorerView(
     var parentForNewSubFolder by remember { mutableStateOf<String?>(null) }
     var folderToRename by remember { mutableStateOf<Pair<String, String?>?>(null) } // (mainCat, subCat)
     var folderToDelete by remember { mutableStateOf<Pair<String, String?>?>(null) }
+    var folderToChangeIconAndLogo by remember { mutableStateOf<Pair<String, String?>?>(null) } // Pair(mainFolderIdOrName, subFolderIdOrName?)
     var showCreateDocTypeDialog by remember { mutableStateOf(false) }
 
     // Aktiver Filter-Konfigurations-Dialog
@@ -768,6 +770,11 @@ fun DmsExplorerView(
                         ?: mainTmpls.firstOrNull { it.mainCategoryId.isNotBlank() }?.mainCategoryId.orEmpty()
                     val mainDocsSizeFormatted = folderSizes.first[mainCat] ?: "0 B"
 
+                    val matchedFolder = foldersHierarchy.find { it.name.equals(mainCat, ignoreCase = true) }
+                    val folderIcon = matchedFolder?.iconName ?: ""
+                    val folderLogo = matchedFolder?.companyLogo ?: ""
+                    val folderCustomLogoUri = matchedFolder?.customLogoUri ?: ""
+
                     item(key = "header_$mainCat") {
                         var showMainCatMenu by remember { mutableStateOf(false) }
 
@@ -787,11 +794,12 @@ fun DmsExplorerView(
                                     verticalAlignment = Alignment.CenterVertically,
                                     modifier = Modifier.weight(1f)
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.FolderOpen,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(22.dp)
+                                    com.example.ui.components.DocumentOrFolderIcon(
+                                        iconName = folderIcon,
+                                        companyLogo = folderLogo,
+                                        customLogoUri = folderCustomLogoUri,
+                                        isFolder = true,
+                                        size = 26.dp
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     if (mainPrefix.isNotBlank()) {
@@ -864,6 +872,14 @@ fun DmsExplorerView(
                                                 folderToRename = Pair(mainCat, null)
                                             }
                                         )
+                                        DropdownMenuItem(
+                                            text = { Text("Icon & Logo anpassen") },
+                                            leadingIcon = { Icon(Icons.Default.Category, contentDescription = null) },
+                                            onClick = {
+                                                showMainCatMenu = false
+                                                folderToChangeIconAndLogo = Pair(mainCat, null)
+                                            }
+                                        )
                                         HorizontalDivider()
                                         DropdownMenuItem(
                                             text = { Text("Ordner löschen", color = MaterialTheme.colorScheme.error) },
@@ -901,6 +917,11 @@ fun DmsExplorerView(
                             ?: subTmpls.firstOrNull { it.subCategoryId.isNotBlank() }?.subCategoryId.orEmpty()
                         val subSizeFormatted = folderSizes.second["${mainCat}_$subCat"] ?: "0 B"
 
+                        val matchedSubFolder = matchedFolder?.subFolders?.find { it.name.equals(subCat, ignoreCase = true) }
+                        val subFolderIcon = matchedSubFolder?.iconName ?: ""
+                        val subFolderLogo = matchedSubFolder?.companyLogo ?: ""
+                        val subFolderCustomLogoUri = matchedSubFolder?.customLogoUri ?: ""
+
                         item(key = "sub_${mainCat}_$subCat") {
                             var showSubCatMenu by remember { mutableStateOf(false) }
 
@@ -920,7 +941,21 @@ fun DmsExplorerView(
                                         modifier = Modifier.weight(1f)
                                     ) {
                                         Text(
-                                            text = if (subPrefix.isNotBlank()) "↳ $subPrefix-$subCat" else "↳ $subCat",
+                                            text = "↳ ",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                        )
+                                        com.example.ui.components.DocumentOrFolderIcon(
+                                            iconName = subFolderIcon,
+                                            companyLogo = subFolderLogo,
+                                            customLogoUri = subFolderCustomLogoUri,
+                                            isFolder = true,
+                                            size = 22.dp
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = if (subPrefix.isNotBlank()) "$subPrefix-$subCat" else subCat,
                                             style = MaterialTheme.typography.labelMedium,
                                             fontWeight = FontWeight.SemiBold,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -955,6 +990,14 @@ fun DmsExplorerView(
                                                 onClick = {
                                                     showSubCatMenu = false
                                                     folderToRename = Pair(mainCat, subCat)
+                                                }
+                                            )
+                                            DropdownMenuItem(
+                                                text = { Text("Icon & Logo anpassen") },
+                                                leadingIcon = { Icon(Icons.Default.Category, contentDescription = null) },
+                                                onClick = {
+                                                    showSubCatMenu = false
+                                                    folderToChangeIconAndLogo = Pair(mainCat, subCat)
                                                 }
                                             )
                                             DropdownMenuItem(
@@ -1463,6 +1506,9 @@ fun DmsExplorerView(
             onUpdateContractReminder = { docId, endDate, cancelDate, remDays, hasRem, eventType, notes, amt ->
                 viewModel.updateContractReminders(docId, endDate, cancelDate, remDays, hasRem, eventType, notes, amt)
             },
+            onUpdateDocumentIconAndLogo = { docId, iconName, companyLogo ->
+                viewModel.updateDocumentIconAndLogo(docId, iconName, companyLogo)
+            },
             onDismissRequest = { selectedDocumentForDetail = null }
         )
     }
@@ -1537,6 +1583,42 @@ fun DmsExplorerView(
                 viewModel.deleteFolderStructure(mainCat, subCat, deleteContainedDocuments = true)
                 folderToDelete = null
             }
+        )
+    }
+
+    // DIALOG: ORDNER-SYMBOL & FIRMENLOGO ANPASSEN (INKLUSIVE BILD-UPLOAD AUS GALERIE)
+    folderToChangeIconAndLogo?.let { (mainCat, subCat) ->
+        val isSub = subCat != null
+        val matchedFolderItem = foldersHierarchy.find { it.name.equals(mainCat, ignoreCase = true) || it.id.equals(mainCat, ignoreCase = true) }
+        val currentIcon = if (isSub) {
+            matchedFolderItem?.subFolders?.find { it.name.equals(subCat, ignoreCase = true) || it.id.equals(subCat, ignoreCase = true) }?.iconName ?: ""
+        } else {
+            matchedFolderItem?.iconName ?: ""
+        }
+        val currentLogo = if (isSub) {
+            matchedFolderItem?.subFolders?.find { it.name.equals(subCat, ignoreCase = true) || it.id.equals(subCat, ignoreCase = true) }?.companyLogo ?: ""
+        } else {
+            matchedFolderItem?.companyLogo ?: ""
+        }
+        val currentCustomLogoUri = if (isSub) {
+            matchedFolderItem?.subFolders?.find { it.name.equals(subCat, ignoreCase = true) || it.id.equals(subCat, ignoreCase = true) }?.customLogoUri ?: ""
+        } else {
+            matchedFolderItem?.customLogoUri ?: ""
+        }
+        val folderDisplayName = if (isSub) "$mainCat ↳ $subCat" else mainCat
+
+        com.example.ui.components.UniversalIconAndLogoPickerDialog(
+            title = "Ordner-Symbol & Logo",
+            subtitle = folderDisplayName,
+            currentIcon = currentIcon,
+            currentLogo = currentLogo,
+            currentCustomLogoUri = currentCustomLogoUri,
+            isFolder = true,
+            onSave = { iconName, companyLogo, customLogoUri ->
+                viewModel.updateFolderIconAndLogo(mainCat, subCat, iconName, companyLogo, customLogoUri)
+                folderToChangeIconAndLogo = null
+            },
+            onDismiss = { folderToChangeIconAndLogo = null }
         )
     }
 
@@ -1731,23 +1813,13 @@ fun DocumentCard(
             modifier = Modifier.padding(14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(
-                        if (isImage) MaterialTheme.colorScheme.tertiaryContainer
-                        else MaterialTheme.colorScheme.primaryContainer
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = if (isImage) Icons.Default.Image else Icons.Default.PictureAsPdf,
-                    contentDescription = null,
-                    tint = if (isImage) MaterialTheme.colorScheme.onTertiaryContainer else MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
+            com.example.ui.components.DocumentOrFolderIcon(
+                iconName = document.customIcon,
+                companyLogo = document.companyLogo,
+                isFolder = false,
+                isImage = isImage,
+                size = 44.dp
+            )
 
             Spacer(modifier = Modifier.width(14.dp))
 
