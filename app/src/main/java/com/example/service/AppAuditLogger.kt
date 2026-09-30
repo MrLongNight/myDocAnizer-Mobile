@@ -38,9 +38,21 @@ data class AuditLogEntry(
         get() = SimpleDateFormat("dd.MM.yyyy HH:mm:ss.SSS", Locale.GERMAN).format(Date(timestamp))
 
     fun toLogLine(): String {
-        val errPrefix = if (isError) "[ERROR] " else ""
+        val errPrefix = if (isError) "[🚨 ERROR] " else ""
         val detailsStr = if (details.isNotBlank()) " | Details: $details" else ""
-        return "[$formattedTime] [${category.name}] [$tag] $errPrefix$message$detailsStr"
+        return "[$formattedTime] [${category.icon} ${category.name}] [$tag] $errPrefix$message$detailsStr"
+    }
+
+    fun toFormattedBlock(): String {
+        val statusIcon = if (isError) "🚨 FEHLER" else "${category.icon} ${category.label}"
+        val sb = StringBuilder()
+        sb.append("[$formattedTime] [$statusIcon] Modul: [$tag]\n")
+        sb.append("   ↳ Status:  $message\n")
+        if (details.isNotBlank()) {
+            sb.append("   ↳ Details: $details\n")
+        }
+        sb.append("--------------------------------------------------------------------------------\n")
+        return sb.toString()
     }
 }
 
@@ -216,28 +228,37 @@ object AppAuditLogger {
     fun exportLogFile(context: Context): File {
         val exportDir = File(context.cacheDir, "exports").apply { if (!exists()) mkdirs() }
         val dateStr = SimpleDateFormat("yyyy-MM-dd_HHmmss", Locale.getDefault()).format(Date())
+        val prettyDate = SimpleDateFormat("dd.MM.yyyy HH:mm:ss", Locale.GERMAN).format(Date())
         val exportFile = File(exportDir, "myDocAnizer_Diagnose_Protokoll_$dateStr.txt")
+
+        val currentLogs = _logs.value
+        val totalCount = currentLogs.size
+        val errorCount = currentLogs.count { it.isError }
+        val aiCount = currentLogs.count { it.category == LogCategory.AI_INFERENCE }
+        val ocrCount = currentLogs.count { it.category == LogCategory.OCR }
+        val ruleCount = currentLogs.count { it.category == LogCategory.RULE_ENGINE }
+        val dmsCount = currentLogs.count { it.category == LogCategory.STORAGE_DMS }
+        val sysCount = currentLogs.count { it.category == LogCategory.SYSTEM }
 
         exportFile.bufferedWriter(Charsets.UTF_8).use { writer ->
             writer.write("================================================================================\n")
             writer.write("                 myDocAnizer-Mobile - DIAGNOSE & AUDIT-PROTOKOLL\n")
             writer.write("================================================================================\n")
-            writer.write("Erstellt am:   $dateStr\n")
-            writer.write("Datenschutz:   100% On-Device Audit-Log (Keine Cloud-Übertragung)\n")
+            writer.write("Erstellt am:   $prettyDate\n")
+            writer.write("Datenschutz:   100% On-Device Audit-Log (Vollständig offline)\n")
             writer.write("Gerät:         ${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL} (Android ${android.os.Build.VERSION.RELEASE})\n")
+            writer.write("App-Version:   myDocAnizer-Mobile v1.1\n")
+            writer.write("--------------------------------------------------------------------------------\n")
+            writer.write("ÜBERSICHT & STATUS:\n")
+            writer.write("  • Gesamt-Ereignisse: $totalCount\n")
+            writer.write("  • 🚨 Fehler erfasst: $errorCount\n")
+            writer.write("  • Aufschlüsselung:   🤖 KI: $aiCount | 👁️ OCR: $ocrCount | ⚡ Regeln: $ruleCount | 📁 Tresor: $dmsCount | ⚙️ System: $sysCount\n")
+            writer.write("================================================================================\n")
+            writer.write("                           EREIGNISSE (CHRONOLOGISCH)\n")
             writer.write("================================================================================\n\n")
 
-            val file = getLogFile(context)
-            if (file.exists()) {
-                file.forEachLine { line ->
-                    writer.write(line)
-                    writer.write("\n")
-                }
-            } else {
-                _logs.value.reversed().forEach { entry ->
-                    writer.write(entry.toLogLine())
-                    writer.write("\n")
-                }
+            currentLogs.reversed().forEach { entry ->
+                writer.write(entry.toFormattedBlock())
             }
         }
         return exportFile

@@ -131,9 +131,15 @@ class LlmService(private val context: Context) {
         }
     }
 
-    val modelsDir: File by lazy {
-        File(context.filesDir, "models").apply { if (!exists()) mkdirs() }
-    }
+    val modelsDir: File
+        get() = try {
+            val base = context.filesDir ?: context.cacheDir
+            File(base, "models").apply {
+                if (!exists()) mkdirs()
+            }
+        } catch (_: Throwable) {
+            context.cacheDir
+        }
 
     private val httpClient by lazy {
         OkHttpClient.Builder()
@@ -151,15 +157,27 @@ class LlmService(private val context: Context) {
     }
 
     private fun isModelPhysicallyOnDisk(fileName: String): Boolean {
-        if (fileName.isBlank()) return false
-        val file = File(modelsDir, fileName)
-        return file.exists() && file.length() > 1024 * 1024 // min. 1 MB
+        return try {
+            if (fileName.isBlank()) false
+            else {
+                val file = File(modelsDir, fileName)
+                file.exists() && file.length() > 1024 * 1024 // min. 1 MB
+            }
+        } catch (_: Throwable) {
+            false
+        }
     }
 
     private fun getModelDiskSize(fileName: String): Long {
-        if (fileName.isBlank()) return 0L
-        val file = File(modelsDir, fileName)
-        return if (file.exists()) file.length() else 0L
+        return try {
+            if (fileName.isBlank()) 0L
+            else {
+                val file = File(modelsDir, fileName)
+                if (file.exists()) file.length() else 0L
+            }
+        } catch (_: Throwable) {
+            0L
+        }
     }
 
     private fun createInitialModels(hw: DeviceHardwareInfo): List<HuggingFaceModelInfo> {

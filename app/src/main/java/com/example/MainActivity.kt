@@ -27,9 +27,21 @@ class MainActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        com.example.service.AppAuditLogger.init(this)
-        SplashSoundSynthesizer.precompute(this) // Pre-generate the premium audio to prevent initialization latency
-        handleWidgetIntent(intent)
+        try {
+            com.example.service.AppAuditLogger.init(this)
+        } catch (t: Throwable) {
+            android.util.Log.e("MainActivity", "AuditLogger init failed: ${t.message}")
+        }
+        try {
+            SplashSoundSynthesizer.precompute(this)
+        } catch (t: Throwable) {
+            android.util.Log.e("MainActivity", "SplashSoundSynthesizer precompute failed: ${t.message}")
+        }
+        try {
+            handleWidgetIntent(intent)
+        } catch (t: Throwable) {
+            android.util.Log.e("MainActivity", "handleWidgetIntent failed: ${t.message}")
+        }
         enableEdgeToEdge()
         setContent {
             val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
