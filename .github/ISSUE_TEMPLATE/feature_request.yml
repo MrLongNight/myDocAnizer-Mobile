@@ -1,0 +1,51 @@
+# .github/ISSUE_TEMPLATE/feature_request.yml
+name: "✨ Feature Request"
+description: "Schlage eine neue Funktion oder Verbesserung vor"
+title: "[FEATURE] "
+labels: ["enhancement", "needs-triage"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        # ✨ Feature Request
+        Wir freuen uns auf deine Idee! Bitte beschreibe die gewünschte Funktion detailliert.
+
+  - type: textarea
+    attributes:
+      label: "Problembeschreibung"
+      description: "Welches Problem soll gelöst werden? Welcher Use-Case?"
+      placeholder: "Als Nutzer möchte ich..., damit ich..."
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: "Lösungsbeschreibung"
+      description: "Wie sollte die Lösung aussehen?"
+      placeholder: "Die App sollte..."
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: "Alternative Lösungen"
+      description: "Gibt es andere Wege, das Problem zu lösen?"
+      placeholder: "Man könnte auch..."
+
+  - type: textarea
+    attributes:
+      label: "Zusätzlicher Kontext"
+      description: "Weitere Informationen, Links, Wireframes, etc."
+      placeholder: "Screenshots, Links zu ähnlichen Apps, etc."
+
+  - type: checkboxes
+    attributes:
+      label: "Feature-Anforderungen"
+      options:
+        - label: "Feature passt zur Philosophie von myDocAnizer (Transparenz, Sicherheit, Datenschutz)"
+          required: true
+        - label: "Feature ist praktisch umsetzbar"
+          required: false
+        - label: "Ich habe nach ähnlichen Feature-Requests gesucht"
+          required: true
