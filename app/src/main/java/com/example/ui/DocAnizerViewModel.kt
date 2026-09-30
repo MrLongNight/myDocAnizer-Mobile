@@ -36,6 +36,69 @@ class DocAnizerViewModel(application: Application) : AndroidViewModel(applicatio
     val biometricAuthManager = BiometricAuthManager(application)
     val p2pSyncManager = P2pSyncManager(application, db)
 
+    init {
+        settingsRepo.incrementAppLaunchCount()
+    }
+
+    val appLaunchCount: StateFlow<Int> = settingsRepo.appLaunchCount
+    val firstLaunchTime: StateFlow<Long> = settingsRepo.firstLaunchTime
+    val lastRatingDismissedTime: StateFlow<Long> = settingsRepo.lastRatingDismissedTime
+    val launchesSinceDismissal: StateFlow<Int> = settingsRepo.launchesSinceDismissal
+
+    private val _showSuccessRatingPrompt = MutableStateFlow(false)
+    val showSuccessRatingPrompt: StateFlow<Boolean> = _showSuccessRatingPrompt.asStateFlow()
+
+    fun snoozeRatingPrompt() {
+        settingsRepo.snoozeRatingPrompt()
+        _showSuccessRatingPrompt.value = false
+    }
+
+    fun dismissSuccessRatingPrompt() {
+        _showSuccessRatingPrompt.value = false
+    }
+
+    fun triggerRatingPromptOnSuccess() {
+        val hasRated = hasRatedOrSkipped.value
+        val launches = appLaunchCount.value
+        val scans = scannedDocumentCount.value
+        val firstLaunch = firstLaunchTime.value
+        val dismissedTime = lastRatingDismissedTime.value
+        val snoozeLaunches = launchesSinceDismissal.value
+
+        val now = System.currentTimeMillis()
+        val installedAtLeast3Days = (now - firstLaunch) >= 3 * 24 * 60 * 60 * 1000L
+        val snoozeDaysPassed = (now - dismissedTime) >= 14 * 24 * 60 * 60 * 1000L
+        val snoozeLaunchesPassed = snoozeLaunches >= 10
+
+        // Verschärfte, professionelle Kriterien für absolute Unaufdringlichkeit:
+        // 1. Hat noch nicht bewertet oder dauerhaft abgelehnt.
+        // 2. Mindestens 10 App-Launches (etablierter Nutzer).
+        // 3. Mindestens 5 erfolgreiche Dokumentenscans (kennt den Mehrwert der App).
+        // 4. App muss seit mindestens 3 Tagen installiert sein (kein nerviges Pop-up am 1. Tag).
+        // 5. Falls zuvor weggeschoben (snoozed), müssen 14 Tage vergangen UND 10 weitere App-Starts erfolgt sein.
+        val isEligible = !hasRated &&
+                launches >= 10 &&
+                scans >= 5 &&
+                installedAtLeast3Days &&
+                (dismissedTime == 0L || (snoozeDaysPassed && snoozeLaunchesPassed))
+
+        if (isEligible) {
+            _showSuccessRatingPrompt.value = true
+        }
+    }
+    val scannedDocumentCount: StateFlow<Int> = settingsRepo.scannedDocumentCount
+    val hasRatedOrSkipped: StateFlow<Boolean> = settingsRepo.hasRatedOrSkipped
+
+    fun incrementScannedDocumentCount() {
+        settingsRepo.incrementScannedDocumentCount()
+        triggerRatingPromptOnSuccess()
+    }
+
+    fun setHasRatedOrSkipped(value: Boolean) {
+        settingsRepo.setHasRatedOrSkipped(value)
+        _showSuccessRatingPrompt.value = false
+    }
+
     // Vordefinierte & Benutzerdefinierte Zusatzfelder (Custom Fields)
     val customFields: StateFlow<List<com.example.model.CustomFieldEntity>> = customFieldDao.getAllCustomFields()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -161,6 +224,9 @@ class DocAnizerViewModel(application: Application) : AndroidViewModel(applicatio
     fun addCashTransaction(tx: com.example.model.CashTransactionEntity) {
         viewModelScope.launch(Dispatchers.IO) {
             financeDao.insertCashTransaction(tx)
+            withContext(Dispatchers.Main) {
+                triggerRatingPromptOnSuccess()
+            }
         }
     }
 
@@ -789,6 +855,7 @@ class DocAnizerViewModel(application: Application) : AndroidViewModel(applicatio
                 fileSizeFormatted = "${targetPdfFile.length() / 1024} KB"
             )
             documentDao.insertDocument(docEntity)
+            incrementScannedDocumentCount()
 
             // Aus dem Puffer entfernen
             removeBatchItem(item.id)

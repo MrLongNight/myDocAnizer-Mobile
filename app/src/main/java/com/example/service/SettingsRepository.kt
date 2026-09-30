@@ -1182,4 +1182,63 @@ class SettingsRepository(context: Context) {
             .apply()
         _llmInferenceConfig.value = config
     }
+
+    // App-Rating/Bewertung-Metriken (Call-to-Action)
+    private val _appLaunchCount = MutableStateFlow(prefs.getInt("app_launch_count", 0))
+    val appLaunchCount: StateFlow<Int> = _appLaunchCount.asStateFlow()
+
+    private val _launchesSinceDismissal = MutableStateFlow(prefs.getInt("launches_since_dismissal", 0))
+    val launchesSinceDismissal: StateFlow<Int> = _launchesSinceDismissal.asStateFlow()
+
+    private val _firstLaunchTime = MutableStateFlow(
+        prefs.getLong("first_launch_time", 0L).let { saved ->
+            if (saved == 0L) {
+                val now = System.currentTimeMillis()
+                prefs.edit().putLong("first_launch_time", now).apply()
+                now
+            } else saved
+        }
+    )
+    val firstLaunchTime: StateFlow<Long> = _firstLaunchTime.asStateFlow()
+
+    private val _lastRatingDismissedTime = MutableStateFlow(prefs.getLong("last_rating_dismissed_time", 0L))
+    val lastRatingDismissedTime: StateFlow<Long> = _lastRatingDismissedTime.asStateFlow()
+
+    fun incrementAppLaunchCount() {
+        val newCount = _appLaunchCount.value + 1
+        val newSnoozeCount = _launchesSinceDismissal.value + 1
+        prefs.edit()
+            .putInt("app_launch_count", newCount)
+            .putInt("launches_since_dismissal", newSnoozeCount)
+            .apply()
+        _appLaunchCount.value = newCount
+        _launchesSinceDismissal.value = newSnoozeCount
+    }
+
+    private val _scannedDocumentCount = MutableStateFlow(prefs.getInt("scanned_document_count", 0))
+    val scannedDocumentCount: StateFlow<Int> = _scannedDocumentCount.asStateFlow()
+
+    fun incrementScannedDocumentCount() {
+        val newCount = _scannedDocumentCount.value + 1
+        prefs.edit().putInt("scanned_document_count", newCount).apply()
+        _scannedDocumentCount.value = newCount
+    }
+
+    private val _hasRatedOrSkipped = MutableStateFlow(prefs.getBoolean("has_rated_or_skipped", false))
+    val hasRatedOrSkipped: StateFlow<Boolean> = _hasRatedOrSkipped.asStateFlow()
+
+    fun setHasRatedOrSkipped(value: Boolean) {
+        prefs.edit().putBoolean("has_rated_or_skipped", value).apply()
+        _hasRatedOrSkipped.value = value
+    }
+
+    fun snoozeRatingPrompt() {
+        val now = System.currentTimeMillis()
+        prefs.edit()
+            .putLong("last_rating_dismissed_time", now)
+            .putInt("launches_since_dismissal", 0)
+            .apply()
+        _lastRatingDismissedTime.value = now
+        _launchesSinceDismissal.value = 0
+    }
 }

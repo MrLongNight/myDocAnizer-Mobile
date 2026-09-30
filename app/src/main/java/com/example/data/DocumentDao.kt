@@ -48,6 +48,15 @@ interface DocumentDao {
     """)
     fun searchDocuments(query: String): Flow<List<DocumentEntity>>
 
+    @Query("""
+        SELECT documents.* FROM documents 
+        JOIN documents_fts ON documents.id = documents_fts.docid 
+        WHERE documents.isDeleted = 0 
+          AND documents_fts MATCH :query
+        ORDER BY documents.createdAt DESC
+    """)
+    fun searchDocumentsFts(query: String): Flow<List<DocumentEntity>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertDocument(document: DocumentEntity): Long
 

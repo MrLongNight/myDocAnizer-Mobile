@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+
+    <!-- RECEIPT (Slightly tilted, jagged top and bottom) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:strokeColor="#060A14"
+        android:strokeWidth="1.5"
+        android:pathData="M55,15 L90,19 L87,85 L52,81 Z" />
+    
+    <!-- Receipt Lines -->
+    <path
+        android:strokeColor="#94A3B8"
+        android:strokeWidth="2.5"
+        android:strokeLineCap="round"
+        android:pathData="M60,28 L84,31 M60,38 L80,41 M60,48 L82,51" />
+    
+    <!-- Euro Symbol on Receipt -->
+    <path
+        android:fillColor="#FF007F"
+        android:pathData="M68,62 C66,62 65,64 65,66 C65,68 66,70 68,70 M63,65 L71,65 M63,67 L71,67" />
+
+    <!-- SMARTPHONE (Vertical, rounded corners, glowing cyan/magenta border) -->
+    <path
+        android:fillColor="#060A14"
+        android:strokeColor="#00E5FF"
+        android:strokeWidth="3.5"
+        android:pathData="M12,12 C12,7 48,7 48,12 L48,82 C48,87 12,87 12,82 Z" />
+
+    <!-- Smartphone Screen Inner Border -->
+    <path
+        android:strokeColor="#FF007F"
+        android:strokeWidth="1"
+        android:fillColor="#00000000"
+        android:pathData="M14,14 C14,10 46,10 46,14 L46,80 C46,84 14,84 14,80 Z" />
+
+    <!-- Speaker Bar -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M25,12 L35,12" />
+
+    <!-- CAMERA ICON (Inside the screen) -->
+    <!-- Camera Body -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:strokeColor="#060A14"
+        android:strokeWidth="1.5"
+        android:pathData="M20,40 L24,35 L36,35 L40,40 L40,62 L20,62 Z" />
+    
+    <!-- Lens Outer Circle -->
+    <path
+        android:fillColor="#00E5FF"
+        android:strokeColor="#060A14"
+        android:strokeWidth="1.5"
+        android:pathData="M30,51 C34,51 34,45 30,45 C26,45 26,51 30,51 Z" />
+    
+    <!-- Lens Inner Glass -->
+    <path
+        android:fillColor="#060A14"
+        android:pathData="M30,49 C32,49 32,47 30,47 C28,47 28,49 30,49 Z" />
+
+    <!-- Flash dot -->
+    <path
+        android:fillColor="#FF007F"
+        android:pathData="M 36,41 m -2,0 a 2,2 0 1,1 4,0 a 2,2 0 1,1 -4,0" />
+</vector>

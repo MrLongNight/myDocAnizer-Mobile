@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.ui.DocAnizerViewModel
 import com.example.ui.components.AppStartSplashAnimation
+import com.example.ui.components.SplashSoundSynthesizer
 import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.views.MainScreen
 
@@ -26,6 +27,7 @@ class MainActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        SplashSoundSynthesizer.precompute(this) // Pre-generate the premium audio to prevent initialization latency
         handleWidgetIntent(intent)
         enableEdgeToEdge()
         setContent {

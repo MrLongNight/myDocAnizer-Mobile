@@ -12,17 +12,19 @@ import com.example.model.CustomDashboardWidgetEntity
 import com.example.model.CustomFieldEntity
 import com.example.model.DocumentCustomFieldValueEntity
 import com.example.model.DocumentEntity
+import com.example.model.DocumentFtsEntity
 
 @Database(
     entities = [
         DocumentEntity::class,
+        DocumentFtsEntity::class,
         CustomFieldEntity::class,
         DocumentCustomFieldValueEntity::class,
         CashTransactionEntity::class,
         BankStatementEntryEntity::class,
         CustomDashboardWidgetEntity::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -152,6 +154,13 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE VIRTUAL TABLE IF NOT EXISTS `documents_fts` USING fts4(content=`documents`, `title`, `sender`, `ocrText`, `tags`)")
+                db.execSQL("INSERT INTO `documents_fts` (`docid`, `title`, `sender`, `ocrText`, `tags`) SELECT `id`, `title`, `sender`, `ocrText`, `tags` FROM `documents`")
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -159,7 +168,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "mydocanizer_database"
                 )
-                    .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
+                    .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
                     .fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = instance

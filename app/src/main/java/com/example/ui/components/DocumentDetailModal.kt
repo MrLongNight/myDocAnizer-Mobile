@@ -306,6 +306,14 @@ fun DocumentDetailModal(
                 }
             }
 
+            // GIROCODE / SEPA-ÜBERWEISUNGS CARD
+            Spacer(modifier = Modifier.height(12.dp))
+            com.example.ui.components.GiroCodePaymentCard(
+                ocrText = document.ocrText,
+                defaultSender = document.sender,
+                amountFromDb = document.amount
+            )
+
             // VORDEFINIERTE ZUSATZFELDER (CUSTOM FIELDS)
             val applicableFields = remember(allCustomFields, document) {
                 allCustomFields

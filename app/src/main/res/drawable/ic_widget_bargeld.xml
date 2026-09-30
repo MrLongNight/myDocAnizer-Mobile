@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+
+    <!-- BANKNOTE (Backdrop, angled slightly, rounded corners) -->
+    <path
+        android:fillColor="#8B5CF6"
+        android:pathData="M15,25 L85,15 C88,14 91,16 92,19 L97,45 C98,48 96,51 93,52 L23,62 C20,63 17,61 16,58 L11,32 C10,29 12,26 15,25 Z" />
+
+    <!-- Banknote Inner Details (border) -->
+    <path
+        android:strokeColor="#FF007F"
+        android:strokeWidth="2"
+        android:fillColor="#00000000"
+        android:pathData="M18,27 L82,18" />
+
+    <!-- Banknote Euro/Dollar Symbol -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M52,32 C50,32.5 48,34 48,36 C48,38 52,38.5 52,40 C52,41 50,42 48,41.5 M50,30 L50,44" />
+
+    <!-- COIN STACK (Teal/Cyan, layered overlapping) -->
+    <!-- Bottom Coin -->
+    <path
+        android:fillColor="#006D77"
+        android:strokeColor="#060A14"
+        android:strokeWidth="1.5"
+        android:pathData="M15,65 C15,59 45,59 45,65 C45,71 15,71 15,65 Z" />
+    <path
+        android:fillColor="#00B4D8"
+        android:pathData="M15,65 L15,75 C15,81 45,81 45,75 L45,65 Z" />
+    <path
+        android:fillColor="#00E5FF"
+        android:strokeColor="#060A14"
+        android:strokeWidth="1.5"
+        android:pathData="M15,75 C15,69 45,59 45,75 C45,81 15,81 15,75 Z" />
+
+    <!-- Middle Coin -->
+    <path
+        android:fillColor="#0077B6"
+        android:strokeColor="#060A14"
+        android:strokeWidth="1.5"
+        android:pathData="M15,55 C15,49 45,49 45,55 C45,61 15,61 15,55 Z" />
+    <path
+        android:fillColor="#00B4D8"
+        android:pathData="M15,55 L15,65 C15,61 45,61 45,65 L45,55 Z" />
+    <path
+        android:fillColor="#00E5FF"
+        android:strokeColor="#060A14"
+        android:strokeWidth="1.5"
+        android:pathData="M15,65 C15,59 45,59 45,65 C45,71 15,71 15,65 Z" />
+
+    <!-- Top Coin -->
+    <path
+        android:fillColor="#0096C7"
+        android:strokeColor="#060A14"
+        android:strokeWidth="1.5"
+        android:pathData="M15,45 C15,39 45,39 45,45 C45,51 15,51 15,45 Z" />
+    <path
+        android:fillColor="#00E5FF"
+        android:pathData="M15,45 L15,55 C15,51 45,51 45,55 L45,45 Z" />
+    <path
+        android:fillColor="#00F5FF"
+        android:strokeColor="#060A14"
+        android:strokeWidth="1.5"
+        android:pathData="M15,55 C15,49 45,49 45,55 C45,61 15,61 15,55 Z" />
+
+    <!-- Euro Symbol on Top Coin -->
+    <path
+        android:fillColor="#060A14"
+        android:pathData="M27,51 C25,51 24,53 24,55 C24,57 25,59 27,59 M23,54 L29,54 M23,56 L29,54" />
+
+    <!-- BAR CHART (Green/Cyan) -->
+    <!-- Bar 1 (Low) -->
+    <path
+        android:fillColor="#34D399"
+        android:strokeColor="#060A14"
+        android:strokeWidth="1.5"
+        android:pathData="M55,80 L63,80 L63,90 L55,90 Z" />
+    <!-- Bar 2 (Medium) -->
+    <path
+        android:fillColor="#00D8F6"
+        android:strokeColor="#060A14"
+        android:strokeWidth="1.5"
+        android:pathData="M67,65 L75,65 L77,90 L67,90 Z" />
+    <!-- Bar 3 (High) -->
+    <path
+        android:fillColor="#00FF7F"
+        android:strokeColor="#060A14"
+        android:strokeWidth="1.5"
+        android:pathData="M79,50 L87,50 L87,90 L79,90 Z" />
+
+    <!-- Upward Trend Arrow -->
+    <path
+        android:strokeColor="#00E5FF"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M53,78 L65,60 L78,65 L89,45" />
+    <path
+        android:fillColor="#00E5FF"
+        android:pathData="M89,45 L82,45 L89,52 Z" />
+</vector>

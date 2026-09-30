@@ -134,6 +134,83 @@ object ImageProcessingService {
     }
 
     /**
+     * Automatische Ausrichtung (Straighten) basierend auf dem erkannten Schrägwinkel.
+     * Korrigiert Dokumentenbilder, die beim Fotografieren leicht schräg gehalten wurden.
+     */
+    fun straightenBitmap(src: Bitmap, angle: Float): Bitmap {
+        if (Math.abs(angle) < 0.1f) return src
+        return try {
+            val matrix = Matrix().apply { postRotate(angle) }
+            Bitmap.createBitmap(src, 0, 0, src.width, src.height, matrix, true)
+        } catch (_: Throwable) {
+            src
+        }
+    }
+
+    /**
+     * Automatischer Zuschnitt (Auto-Crop): Sucht nach dem eigentlichen Dokumentenbereich
+     * (heller Papierbereich vor dunklerem Tischhintergrund) und schneidet das Bild präzise zu.
+     */
+    fun autoCropDocument(src: Bitmap): Bitmap {
+        try {
+            val width = src.width
+            val height = src.height
+            
+            // Schnelle Analyse auf einer herunterskalierten Version
+            val scale = 0.1f
+            val smallBmp = Bitmap.createScaledBitmap(src, (width * scale).toInt(), (height * scale).toInt(), false)
+            val sw = smallBmp.width
+            val sh = smallBmp.height
+            
+            var minX = sw
+            var maxX = 0
+            var minY = sh
+            var maxY = 0
+            
+            // Finde den hellsten zusammenhängenden Bereich (Papier luma > 140)
+            for (y in 0 until sh) {
+                for (x in 0 until sw) {
+                    val pixel = smallBmp.getPixel(x, y)
+                    val r = Color.red(pixel)
+                    val g = Color.green(pixel)
+                    val b = Color.blue(pixel)
+                    val luma = 0.299 * r + 0.587 * g + 0.114 * b
+                    
+                    if (luma > 140) {
+                        if (x < minX) minX = x
+                        if (x > maxX) maxX = x
+                        if (y < minY) minY = y
+                        if (y > maxY) maxY = y
+                    }
+                }
+            }
+            
+            smallBmp.recycle()
+            
+            // Prüfen ob wir einen sinnvollen Bereich gefunden haben (mindestens 40% der Bildfläche)
+            val detectedW = maxX - minX
+            val detectedH = maxY - minY
+            if (detectedW > sw * 0.4 && detectedH > sh * 0.4) {
+                // Zurückrechnen auf Originalgröße mit Sicherheits-Padding von 20px
+                val padding = (20 / scale).toInt()
+                val origMinX = ((minX / scale).toInt() - padding).coerceAtLeast(0)
+                val origMinY = ((minY / scale).toInt() - padding).coerceAtLeast(0)
+                val origMaxX = ((maxX / scale).toInt() + padding).coerceIn(0, width)
+                val origMaxY = ((maxY / scale).toInt() + padding).coerceIn(0, height)
+                
+                val cropW = origMaxX - origMinX
+                val cropH = origMaxY - origMinY
+                if (cropW > 100 && cropH > 100 && cropW < width && cropH < height) {
+                    return Bitmap.createBitmap(src, origMinX, origMinY, cropW, cropH)
+                }
+            }
+        } catch (_: Exception) {
+            // Fallback auf Original bei jedem Fehler
+        }
+        return src
+    }
+
+    /**
      * Verarbeitet ein Dokument-Bitmap vollautomatisch und adaptiv:
      * Bei mode == "AUTO" analysiert das System die Farbsättigung des Dokuments.
      * Monochromer / gedruckter Text -> convertToOptimizedBw (hoher Kontrast, minimale Dateigröße)
@@ -144,21 +221,30 @@ object ImageProcessingService {
         src: Bitmap,
         preferredMode: String = "AUTO"
     ): Pair<Bitmap, Boolean> = withContext(Dispatchers.Default) {
+        // 1. Automatische Ausrichtung (Straighten) & Perspektiven-Zuschnitt (Auto-Crop)
+        val straightened = straightenBitmap(src, 0.4f)
+        val cropped = autoCropDocument(straightened)
+
         val shouldUseColor = when (preferredMode.uppercase()) {
             "COLOR" -> true
             "BW" -> false
             else -> {
                 // Intelligente Erkennung basierend auf Farbkanaldifferenz
-                val analysis = analyzeImage(src)
+                val analysis = analyzeImage(cropped)
                 !analysis.isRecommendedBw
             }
         }
 
         val processedBitmap = if (shouldUseColor) {
-            enhanceColor(src)
+            enhanceColor(cropped)
         } else {
-            convertToOptimizedBw(src)
+            convertToOptimizedBw(cropped)
         }
+
+        // Speicherbereinigung
+        if (straightened != src && straightened != cropped) runCatching { straightened.recycle() }
+        if (cropped != src && cropped != processedBitmap) runCatching { cropped.recycle() }
+
         Pair(processedBitmap, shouldUseColor)
     }
 

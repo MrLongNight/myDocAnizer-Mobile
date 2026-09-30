@@ -2,6 +2,7 @@ package com.example.model
 
 import androidx.compose.runtime.Immutable
 import androidx.room.Entity
+import androidx.room.Fts4
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
@@ -48,6 +49,15 @@ data class DocumentEntity(
     val amount: Double? = null,                 // Rechnungsbetrag oder monatliche Kosten
     val customIcon: String = "",                // Optionales benutzerdefiniertes Icon
     val companyLogo: String = ""                // Optionales Firmenlogo (z.B. "telekom", "allianz", "amazon")
+)
+
+@Fts4(contentEntity = DocumentEntity::class)
+@Entity(tableName = "documents_fts")
+data class DocumentFtsEntity(
+    val title: String,
+    val sender: String,
+    val ocrText: String,
+    val tags: String
 )
 
 enum class CustomFieldType(val label: String) {

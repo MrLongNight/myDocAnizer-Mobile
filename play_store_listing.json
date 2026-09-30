@@ -1,0 +1,39 @@
+{
+  "listing": {
+    "title": "myDocAnizer Dokumenten-Tresor",
+    "title_length": 29,
+    "short_description": "Einfach abfotografieren – unsere smarte KI sortiert & sichert deine Dokumente!",
+    "short_description_length": 79,
+    "full_description": "Fotografieren & fertig! Scanne deine Dokumente einfach per Foto – unsere smarte KI-Dokumentenverarbeitung übernimmt die automatische Sortierung, Benennung und sichere Ablage vollkommen von selbst. Minimaler Aufwand für dich, maximale Ordnung für deine Unterlagen!\n\nSchluss mit dem Zettelchaos, lästigem Lochen und dicken, verstaubten Aktenordnern! Mit myDocAnizer-Mobile erlebst du die Zukunft der digitalen Dokumentenverwaltung bei absolut minimalem Aufwand. Egal ob Verträge, Rechnungen, Kassenbons oder Briefe: Du musst sie lediglich kurz mit deiner Kamera abfotografieren. Unsere hochmoderne On-Device KI liest den Text, kategorisiert das Dokument und ordnet es blitzschnell in deinen persönlichen Dokumenten-Tresor ein.\n\nMAXIMALER DATENSCHUTZ NACH IT-STANDARDS – FÜR JEDEN VERSTÄNDLICH:\nSicherheit und Privatsphäre müssen nicht kompliziert sein! myDocAnizer bringt echte militärische IT-Sicherheitsstandards auf dein Smartphone – ohne dass du dafür IT-Fachkenntnisse benötigst. Deine Dokumente werden clientseitig mit dem Industriestandard AES-256 Ende-zu-Ende verschlüsselt. Das bedeutet: Kein dritter Cloud-Anbieter, kein Hacker und nicht einmal wir können deine Dokumente lesen. Alles verbleibt absolut privat, sicher und lokal in deiner Hand.\n\nWARUM MYDOCANIZER DEIN LEBEN LEICHTER MACHT:\n\n★ PHOTO-TO-AI AUTOMATISIERUNG:\n- Nur ein schnelles Foto genügt – kein manuelles Tippen, Benennen oder Sortieren mehr.\n- Lokale On-Device Texterkennung (OCR) macht jedes abfotografierte Dokument sofort durchsuchbar.\n- Smarte automatische Vorschläge für Kategorien, Unterordner, Absender und Tags.\n\n★ MINIMALER AUFWAND VS. PAPIER-CHAOS:\n- Finde jedes Dokument in Sekundenschnelle per Volltextsuche statt stundenlang Ordner zu wälzen.\n- Zweistufige Ordnerhierarchie (Ebene 1: Hauptkategorie, Ebene 2: Unterordner) für eine logische Struktur wie im echten Archiv.\n- Integrierter Bargeld-Tracker: Fotografiere Kassenbons ab und verknüpfe sie direkt mit deinen Ausgaben für eine lückenlose Selbstkontrolle.\n\n★ HOCHSICHER & EINFACH ZU BEDIENEN:\n- Echte Zero-Knowledge-Verschlüsselung (AES-256) schützt deine Privatsphäre zuverlässig.\n- Entsperrung bequem per Biometrie (Fingerabdruck oder Gesichtserkennung) – kein kompliziertes Passwort-Eingeben bei jedem Start.\n- Vollkommen werbefrei, keine Tracker, keine Online-Registrierung und 100% offline-fähig.\n- Sichere deine Daten lokal auf deinem eigenen NAS (WebDAV) oder USB-Speicher.\n- Synchronisiere deine Geräte ganz privat via WLAN (P2P-Sync).\n\nKI-DISCLOSURE:\nDie automatische Analyse, Kategorisierung und Benennung von Dokumenten nutzt generative KI-Modelle. Da KI-generierte Vorschläge in seltenen Fällen Ungenauigkeiten enthalten können, lassen sich alle vorgeschlagenen Ordner, Absender und Schlagwörter vor dem Speichern mit einem Klick manuell prüfen und anpassen.\n\nErsetze dein altes Papierarchiv noch heute durch den intelligentesten und sichersten digitalen Dokumenten-Tresor. Jetzt herunterladen und maximale Ordnung bei minimalem Aufwand genießen!",
+    "full_description_length": 3073
+  },
+  "capability_inventory": [
+    {
+      "capability": "Clientseitig verschlüsselter Dokumenten-Tresor (AES-256)",
+      "evidence": "app/src/main/java/com/example/service/DocumentStorageService.kt"
+    },
+    {
+      "capability": "On-Device OCR & Intelligente Verschlagwortung",
+      "evidence": "app/src/main/java/com/example/service/OcrService.kt"
+    },
+    {
+      "capability": "On-Device & Hybrid KI-Inferenz (Local LLM / Gemini API)",
+      "evidence": "app/src/main/java/com/example/service/LlmService.kt"
+    },
+    {
+      "capability": "Bargeld-Tracker & Haushaltsbuch mit Bankdaten-Abgleich",
+      "evidence": "app/src/main/java/com/example/data/AppDatabase.kt (financeDao)"
+    },
+    {
+      "capability": "WLAN Peer-to-Peer Master-Master Synchronisation (Offline-Sync)",
+      "evidence": "app/src/main/java/com/example/service/P2pSyncServer.kt"
+    }
+  ],
+  "disclosures_applied": [
+    {
+      "category": "AI-Generated Content",
+      "disclosure_text": "Die automatische Analyse, Kategorisierung und Benennung von Dokumenten nutzt generative KI-Modelle. Da KI-generierte Vorschläge in seltenen Fällen Ungenauigkeiten enthalten können, lassen sich alle vorgeschlagenen Ordner, Absender und Schlagwörter vor dem Speichern mit einem Klick manuell prüfen und anpassen."
+    }
+  ],
+  "omitted_for_lack_of_evidence": []
+}

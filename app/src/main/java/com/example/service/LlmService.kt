@@ -603,7 +603,7 @@ class LlmService(private val context: Context) {
     suspend fun queryDocumentAssistant(
         question: String,
         documents: List<DocumentEntity>
-    ): String = withContext(Dispatchers.IO) {
+    ): String = withContext(Dispatchers.Default) {
         _isGenerating.value = true
         try {
             kotlinx.coroutines.delay(650) // Simulation der lokalen NPU/CPU-Inferenzzeit

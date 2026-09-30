@@ -679,6 +679,80 @@ fun MainScreen(
                 }
             )
         }
+
+        // 3. Premium App Rating Dialog (ASO & Feedback Call-to-Action)
+        val showSuccessRatingPrompt by viewModel.showSuccessRatingPrompt.collectAsStateWithLifecycle()
+
+        if (showSuccessRatingPrompt) {
+            val context = androidx.compose.ui.platform.LocalContext.current
+
+            AlertDialog(
+                onDismissRequest = { 
+                    viewModel.dismissSuccessRatingPrompt()
+                },
+                icon = { Icon(Icons.Default.RateReview, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(36.dp)) },
+                title = { Text("Deine ehrliche Meinung zählt!", fontWeight = FontWeight.Bold) },
+                text = {
+                    Text(
+                        text = "Wir glauben an 100% Transparenz, herausragende Qualität und ehrlichen Support statt undurchsichtiger Tricks. Als unabhängiges, werbefreies Projekt freuen wir uns über jede ehrliche Bewertung im Play Store – egal ob Lob, Anregung oder konstruktive Kritik.\n\nDeine Meinung hilft uns, myDocAnizer stetig weiterzuentwickeln, und zeigt anderen, dass wir uns aktiv um die App und unsere Community kümmern!",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            viewModel.setHasRatedOrSkipped(true)
+                            try {
+                                val intent = android.content.Intent(
+                                    android.content.Intent.ACTION_VIEW,
+                                    android.net.Uri.parse("market://details?id=${context.packageName}")
+                                ).apply {
+                                    addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                }
+                                context.startActivity(intent)
+                            } catch (e: Exception) {
+                                val webIntent = android.content.Intent(
+                                    android.content.Intent.ACTION_VIEW,
+                                    android.net.Uri.parse("https://play.google.com/store/apps/details?id=${context.packageName}")
+                                )
+                                context.startActivity(webIntent)
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                    ) {
+                        Text("⭐ Im Play Store bewerten")
+                    }
+                },
+                dismissButton = {
+                    Row {
+                        TextButton(
+                            onClick = {
+                                // Später erinnern (Nutzt professionelles Snooze: Zeigt den Dialog erst nach 14 Tagen & 10 Starts wieder!)
+                                viewModel.snoozeRatingPrompt()
+                            }
+                        ) {
+                            Text("Später", color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
+                        }
+                        Spacer(modifier = Modifier.width(4.dp))
+                        TextButton(
+                            onClick = {
+                                viewModel.setHasRatedOrSkipped(true)
+                                try {
+                                    val mailIntent = android.content.Intent(android.content.Intent.ACTION_SENDTO).apply {
+                                        data = android.net.Uri.parse("mailto:support@mydocanizer.com")
+                                        putExtra(android.content.Intent.EXTRA_SUBJECT, "Ehrliches Feedback myDocAnizer-Mobile")
+                                        addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    }
+                                    context.startActivity(mailIntent)
+                                } catch (_: Exception) {}
+                            }
+                        ) {
+                            Text("Feedback per E-Mail", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            )
+        }
     }
 }
 
