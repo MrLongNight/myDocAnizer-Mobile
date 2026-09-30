@@ -2,11 +2,14 @@ package com.example.ui.views
 
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -113,23 +116,38 @@ fun RulesAndAiSettingsTab(
                 text = { Text("HuggingFace LLMs") },
                 icon = { Icon(Icons.Default.SmartToy, contentDescription = null, modifier = Modifier.size(18.dp)) }
             )
+            Tab(
+                selected = selectedTab == 2,
+                onClick = { selectedTab = 2 },
+                text = { Text("Diagnose & Log") },
+                icon = { Icon(Icons.Default.BugReport, contentDescription = null, modifier = Modifier.size(18.dp)) }
+            )
         }
 
-        if (selectedTab == 0) {
-            // TAB 1: Schlagwort-Regeln vor KI
-            RulesListContent(
-                rules = docRules,
-                onToggleRule = { id, enabled -> viewModel.toggleDocRule(id, enabled) },
-                onEditRule = { rule -> editingRule = rule },
-                onDeleteRule = { id -> viewModel.deleteDocRule(id) },
-                onOpenAiAssistant = { showAiRuleDialog = true },
-                onAddNewRule = { showCreateRuleDialog = true }
-            )
-        } else {
-            // TAB 2: HuggingFace On-Device Modelle
-            HuggingFaceModelsContent(
-                viewModel = viewModel
-            )
+        when (selectedTab) {
+            0 -> {
+                // TAB 1: Schlagwort-Regeln vor KI
+                RulesListContent(
+                    rules = docRules,
+                    onToggleRule = { id, enabled -> viewModel.toggleDocRule(id, enabled) },
+                    onEditRule = { rule -> editingRule = rule },
+                    onDeleteRule = { id -> viewModel.deleteDocRule(id) },
+                    onOpenAiAssistant = { showAiRuleDialog = true },
+                    onAddNewRule = { showCreateRuleDialog = true }
+                )
+            }
+            1 -> {
+                // TAB 2: HuggingFace On-Device Modelle
+                HuggingFaceModelsContent(
+                    viewModel = viewModel
+                )
+            }
+            2 -> {
+                // TAB 3: 100% Lokales Diagnose- & Inferenz-Audit-Log
+                AuditLogContent(
+                    viewModel = viewModel
+                )
+            }
         }
     }
 
@@ -1157,4 +1175,260 @@ fun EditRuleDialog(
             }
         }
     )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AuditLogContent(viewModel: DocAnizerViewModel) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val auditLogs by viewModel.auditLogs.collectAsStateWithLifecycle()
+    val availableModels by viewModel.availableModels.collectAsStateWithLifecycle()
+    val activeModel = availableModels.find { it.isSelected } ?: availableModels.firstOrNull()
+
+    var selectedCategoryFilter by remember { mutableStateOf<com.example.service.LogCategory?>(null) }
+    var searchQuery by remember { mutableStateOf("") }
+
+    val filteredLogs = remember(auditLogs, selectedCategoryFilter, searchQuery) {
+        auditLogs.filter { entry ->
+            val matchesCategory = selectedCategoryFilter == null || entry.category == selectedCategoryFilter
+            val matchesSearch = searchQuery.isBlank() ||
+                entry.message.contains(searchQuery, ignoreCase = true) ||
+                entry.details.contains(searchQuery, ignoreCase = true) ||
+                entry.tag.contains(searchQuery, ignoreCase = true)
+            matchesCategory && matchesSearch
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .testTag("audit_log_tab"),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        // Status- & Export-Card
+        Card(
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(Icons.Default.Security, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                            }
+                        }
+                        Column {
+                            Text("100% Lokales Audit- & Diagnose-Log", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                            Text("DSGVO-konform: Keine Cloud-Übertragung, 0 Byte Abfluss", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant)
+                ) {
+                    Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Aktives KI-Modell:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("${activeModel?.name ?: "Keines"} (${activeModel?.quantFormat ?: ""})", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                        }
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("Protokoll-Einträge:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("${auditLogs.size} Ereignisse im Speicher", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
+                        }
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = { viewModel.exportAndShareAuditLog(context) },
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("btn_export_audit_log"),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                    ) {
+                        Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Log exportieren / teilen", style = MaterialTheme.typography.labelMedium)
+                    }
+
+                    OutlinedButton(
+                        onClick = { viewModel.clearAuditLogs(context) },
+                        modifier = Modifier.testTag("btn_clear_audit_log")
+                    ) {
+                        Icon(Icons.Default.DeleteOutline, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Leeren", style = MaterialTheme.typography.labelMedium)
+                    }
+                }
+            }
+        }
+
+        // Filter-Chips
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            FilterChip(
+                selected = selectedCategoryFilter == null,
+                onClick = { selectedCategoryFilter = null },
+                label = { Text("Alle (${auditLogs.size})") }
+            )
+            com.example.service.LogCategory.values().forEach { cat ->
+                val count = auditLogs.count { it.category == cat }
+                FilterChip(
+                    selected = selectedCategoryFilter == cat,
+                    onClick = { selectedCategoryFilter = if (selectedCategoryFilter == cat) null else cat },
+                    label = { Text("${cat.icon} ${cat.label} ($count)") }
+                )
+            }
+        }
+
+        // Suchzeile
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = { searchQuery = it },
+            placeholder = { Text("Im Log filtern (z.B. Modell, OCR, Stadtwerke)...") },
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp)) },
+            trailingIcon = {
+                if (searchQuery.isNotEmpty()) {
+                    IconButton(onClick = { searchQuery = "" }) {
+                        Icon(Icons.Default.Clear, contentDescription = null, modifier = Modifier.size(16.dp))
+                    }
+                }
+            },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        // Log-Liste
+        if (filteredLogs.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = if (auditLogs.isEmpty()) "Noch keine Protokolleinträge vorhanden." else "Keine Einträge für den Filter gefunden.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                items(filteredLogs, key = { it.id }) { entry ->
+                    AuditLogItemCard(entry)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun AuditLogItemCard(entry: com.example.service.AuditLogEntry) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = if (entry.isError) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+        border = BorderStroke(0.5.dp, if (entry.isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outlineVariant),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { expanded = !expanded }
+    ) {
+        Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(entry.category.icon)
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = MaterialTheme.colorScheme.surface
+                    ) {
+                        Text(
+                            text = entry.category.label,
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Text(
+                        text = "[${entry.tag}]",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Text(
+                    text = entry.formattedTime,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            Text(
+                text = entry.message,
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.SemiBold,
+                color = if (entry.isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+            )
+
+            if (entry.details.isNotBlank()) {
+                if (expanded) {
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = entry.details,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            modifier = Modifier.padding(8.dp),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                } else {
+                    Text(
+                        text = "Details: ${entry.details.take(90)}${if (entry.details.length > 90) "..." else ""}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+    }
 }

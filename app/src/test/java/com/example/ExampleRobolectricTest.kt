@@ -343,4 +343,83 @@ class ExampleRobolectricTest {
     viewModel.dismissNewModelsNotification()
     assertEquals(null, viewModel.newModelsNotification.value)
   }
+
+  @Test
+  fun `verify general invoice classification and custom fields`() = runBlocking {
+    val app = ApplicationProvider.getApplicationContext<Application>()
+    val viewModel = DocAnizerViewModel(app)
+
+    // Select Qwen 2.5 1.5B
+    viewModel.selectHuggingFaceModel("qwen2.5-1.5b-instruct")
+
+    val ocrText = """
+      Acme Dienstleistungen GmbH
+      Rechnung Nr: RE-2026-9812
+      Kundennummer: KD-49102
+      Rechnungsbetrag: 249,00 €
+      Fälligkeit: 30.04.2026
+      Vielen Dank für Ihren Auftrag.
+    """.trimIndent()
+
+    val result = viewModel.llmService.classifyDocumentText(ocrText)
+    assertEquals("Rechnung", result.docType)
+    assertEquals("A02", result.mainCategoryId)
+    assertEquals("B2.01", result.subCategoryId)
+    assertTrue(result.title.contains("Rechnung"))
+    assertTrue(result.customFields.containsKey("Rechnungsbetrag"))
+    assertTrue(result.customFields["Rechnungsbetrag"]!!.contains("249,00"))
+    assertTrue(result.customFields.containsKey("Fälligkeit"))
+    assertEquals("30.04.2026", result.customFields["Fälligkeit"])
+    assertEquals("qwen2.5-1.5b-instruct", result.modelIdUsed)
+  }
+
+  @Test
+  fun `verify general contract classification and custom fields`() = runBlocking {
+    val app = ApplicationProvider.getApplicationContext<Application>()
+    val viewModel = DocAnizerViewModel(app)
+
+    // Select DeepSeek-R1 Distill
+    viewModel.selectHuggingFaceModel("deepseek-r1-distill-qwen-1.5b")
+
+    val ocrText = """
+      Nordic Fitness Club
+      Mitgliedsvertrag
+      Vertragsnummer: VTR-88192
+      Vertragsdatum: 01.03.2026
+      Monatlicher Beitrag: 39,90 €
+    """.trimIndent()
+
+    val result = viewModel.llmService.classifyDocumentText(ocrText)
+    assertEquals("Vertrag", result.docType)
+    assertEquals("A02", result.mainCategoryId)
+    assertEquals("B2.03", result.subCategoryId)
+    assertTrue(result.title.contains("Vertrag"))
+    assertTrue(result.customFields.containsKey("Vertragsnummer"))
+    assertEquals("VTR-88192", result.customFields["Vertragsnummer"])
+    assertEquals("deepseek-r1-distill-qwen-1.5b", result.modelIdUsed)
+    assertTrue(result.explanation.contains("<think>"))
+  }
+
+  @Test
+  fun `verify AppAuditLogger logging and file export`() {
+    val app = ApplicationProvider.getApplicationContext<Application>()
+    com.example.service.AppAuditLogger.init(app)
+
+    com.example.service.AppAuditLogger.log(
+      category = com.example.service.LogCategory.AI_INFERENCE,
+      tag = "TestInference",
+      message = "Inferenz-Test erfolgreich ausgeführt",
+      details = "Model: qwen2.5-1.5b-instruct"
+    )
+
+    val logs = com.example.service.AppAuditLogger.logs.value
+    assertTrue(logs.any { it.tag == "TestInference" })
+
+    val exportedFile = com.example.service.AppAuditLogger.exportLogFile(app)
+    assertTrue(exportedFile.exists())
+    assertTrue(exportedFile.length() > 0)
+    val content = exportedFile.readText()
+    assertTrue(content.contains("myDocAnizer-Mobile - DIAGNOSE & AUDIT-PROTOKOLL"))
+    assertTrue(content.contains("TestInference"))
+  }
 }

@@ -27,6 +27,7 @@ class MainActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        com.example.service.AppAuditLogger.init(this)
         SplashSoundSynthesizer.precompute(this) // Pre-generate the premium audio to prevent initialization latency
         handleWidgetIntent(intent)
         enableEdgeToEdge()

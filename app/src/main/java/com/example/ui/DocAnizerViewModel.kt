@@ -37,7 +37,37 @@ class DocAnizerViewModel(application: Application) : AndroidViewModel(applicatio
     val p2pSyncManager = P2pSyncManager(application, db)
 
     init {
+        AppAuditLogger.init(application)
         settingsRepo.incrementAppLaunchCount()
+    }
+
+    val auditLogs: StateFlow<List<AuditLogEntry>> = AppAuditLogger.logs
+
+    fun exportAndShareAuditLog(context: android.content.Context) {
+        try {
+            val file = AppAuditLogger.exportLogFile(context)
+            val uri = androidx.core.content.FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                file
+            )
+            val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                putExtra(android.content.Intent.EXTRA_SUBJECT, "myDocAnizer Diagnose- & Audit-Protokoll")
+                addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            val chooser = android.content.Intent.createChooser(intent, "Diagnose-Log teilen / exportieren").apply {
+                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(chooser)
+        } catch (e: Exception) {
+            Log.e("DocAnizerViewModel", "Fehler beim Exportieren des Audit-Logs: ${e.message}", e)
+        }
+    }
+
+    fun clearAuditLogs(context: android.content.Context) {
+        AppAuditLogger.clearLogs(context)
     }
 
     val appLaunchCount: StateFlow<Int> = settingsRepo.appLaunchCount
@@ -452,6 +482,7 @@ class DocAnizerViewModel(application: Application) : AndroidViewModel(applicatio
     val lastCatalogSync: StateFlow<Long> = llmService.lastCatalogSync
 
     fun selectModel(modelId: String) = llmService.selectModel(modelId)
+    fun selectHuggingFaceModel(modelId: String) = llmService.selectModel(modelId)
     fun downloadModel(modelId: String, onProgress: (Float) -> Unit = {}) {
         viewModelScope.launch { llmService.downloadModel(modelId, onProgress) }
     }
@@ -1947,16 +1978,23 @@ class DocAnizerViewModel(application: Application) : AndroidViewModel(applicatio
                 } else {
                     // Fall B: Keine passende Regel -> Lokale On-Device KI erzeugt Regel-Vorschlag
                     val aiClass = llmService.classifyDocumentText(ocrText)
-                    val suggestedKeywords = ocrText.split("\\s+".toRegex())
-                        .filter { it.length > 4 }
-                        .take(3)
-                        .map { it.lowercase() }
+                    val smartKeywords = if (aiClass.smartKeywords.isNotEmpty()) {
+                        aiClass.smartKeywords
+                    } else {
+                        ocrText.lowercase()
+                            .replace(Regex("[^a-zäöüß0-9\\s]"), " ")
+                            .split(Regex("\\s+"))
+                            .filter { it.length in 5..20 }
+                            .distinct()
+                            .take(4)
+                            .ifEmpty { listOf(aiClass.sender.lowercase()) }
+                    }
 
                     val (suggestedIcon, suggestedLogo) = com.example.ui.components.detectSuggestedLogoAndIcon(aiClass.sender, ocrText, aiClass.mainCategoryId)
 
                     val suggestedRule = com.example.model.DocRule(
                         name = aiClass.title.ifBlank { "Scan ${aiClass.sender}" },
-                        matchKeywords = suggestedKeywords.ifEmpty { listOf(aiClass.sender.lowercase()) },
+                        matchKeywords = smartKeywords,
                         targetMainCategoryId = aiClass.mainCategoryId,
                         targetSubCategoryId = aiClass.subCategoryId,
                         targetDocType = aiClass.docType,
@@ -1965,7 +2003,8 @@ class DocAnizerViewModel(application: Application) : AndroidViewModel(applicatio
                         isEnabled = true,
                         isAiGenerated = true,
                         targetIcon = suggestedIcon,
-                        targetLogo = suggestedLogo
+                        targetLogo = suggestedLogo,
+                        targetCustomFields = aiClass.customFields
                     )
 
                     _isProcessingScan.value = false
@@ -2087,6 +2126,45 @@ class DocAnizerViewModel(application: Application) : AndroidViewModel(applicatio
 
                 val newId = documentDao.insertDocument(entity)
                 val created = entity.copy(id = newId)
+
+                // Strukturierte Zusatzfelder in Room Datenbank persistieren
+                if (rule.targetCustomFields.isNotEmpty()) {
+                    val existingFields = customFieldDao.getAllCustomFieldsList()
+                    rule.targetCustomFields.forEach { (fieldName, fieldValue) ->
+                        if (fieldName.isNotBlank() && fieldValue.isNotBlank()) {
+                            val matchingField = existingFields.find { it.name.equals(fieldName, ignoreCase = true) }
+                            val fieldId = matchingField?.id ?: run {
+                                val newField = com.example.model.CustomFieldEntity(
+                                    id = UUID.randomUUID().toString(),
+                                    name = fieldName,
+                                    description = "Automatisch von lokaler KI erfasst",
+                                    type = when {
+                                        fieldValue.contains("€") || fieldValue.matches(Regex(".*[0-9]+[.,][0-9]{2}.*")) -> com.example.model.CustomFieldType.AMOUNT
+                                        fieldValue.matches(Regex(".*[0-9]{1,2}\\.[0-9]{1,2}\\.[0-9]{2,4}.*")) -> com.example.model.CustomFieldType.DATE
+                                        else -> com.example.model.CustomFieldType.TEXT
+                                    },
+                                    scope = com.example.model.CustomFieldScope.GLOBAL
+                                )
+                                customFieldDao.insertCustomField(newField)
+                                newField.id
+                            }
+                            customFieldDao.insertOrUpdateFieldValue(
+                                com.example.model.DocumentCustomFieldValueEntity(
+                                    documentId = newId,
+                                    customFieldId = fieldId,
+                                    fieldValue = fieldValue
+                                )
+                            )
+                        }
+                    }
+                }
+
+                AppAuditLogger.log(
+                    category = LogCategory.STORAGE_DMS,
+                    tag = "DocumentStorage",
+                    message = "Dokument '${created.title}' (${created.sender}) erfolgreich im Tresor abgelegt",
+                    details = "ID: $newId | Pfad: ${created.filePath} | Regel: '${rule.name}' | Zusatzfelder: ${rule.targetCustomFields.size}"
+                )
 
                 _lastBulkSavedDoc.value = created
 

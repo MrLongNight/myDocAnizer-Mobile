@@ -34,6 +34,7 @@ fun PendingRuleSuggestionDialog(
     var selectedIcon by remember { mutableStateOf(suggestion.suggestedRule.targetIcon.ifBlank { "description" }) }
     var selectedLogo by remember { mutableStateOf(suggestion.suggestedRule.targetLogo) }
     var showIconPicker by remember { mutableStateOf(false) }
+    var customFieldsMap by remember { mutableStateOf(suggestion.suggestedRule.targetCustomFields) }
 
     if (showIconPicker) {
         com.example.ui.components.UniversalIconAndLogoPickerDialog(
@@ -199,6 +200,64 @@ fun PendingRuleSuggestionDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
 
+                // Erkannte strukturierte Zusatzfelder
+                if (customFieldsMap.isNotEmpty()) {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Label,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "Erkannte Zusatzfelder (${customFieldsMap.size}):",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                            customFieldsMap.forEach { (key, value) ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = key,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Surface(
+                                        shape = RoundedCornerShape(6.dp),
+                                        color = MaterialTheme.colorScheme.surface,
+                                        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant)
+                                    ) {
+                                        Text(
+                                            text = value,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(4.dp))
 
                 // Aktions-Buttons: Einmalig anwenden vs. Dauerhafte Regel
@@ -219,7 +278,8 @@ fun PendingRuleSuggestionDialog(
                                 targetSubCategoryId = subCatId,
                                 matchKeywords = if (kwList.isNotEmpty()) kwList else listOf(sender.lowercase()),
                                 targetIcon = selectedIcon,
-                                targetLogo = selectedLogo
+                                targetLogo = selectedLogo,
+                                targetCustomFields = customFieldsMap
                             )
                             suggestion.onSaveAsPermanentRule(updatedRule)
                         },
@@ -246,10 +306,11 @@ fun PendingRuleSuggestionDialog(
                                 targetSubCategoryId = subCatId,
                                 matchKeywords = if (kwList.isNotEmpty()) kwList else listOf(sender.lowercase()),
                                 targetIcon = selectedIcon,
-                                targetLogo = selectedLogo
+                                targetLogo = selectedLogo,
+                                targetCustomFields = customFieldsMap
                             )
-                            // We can use updatedRule for single use too so the created DocumentEntity receives the customized Icon and Logo!
-                            suggestion.onSaveAsPermanentRule(updatedRule)
+                            // We use updatedRule for single use too so the created DocumentEntity receives the customized Icon, Logo and CustomFields!
+                            suggestion.onSingleUseOnly()
                         },
                         modifier = Modifier
                             .fillMaxWidth()

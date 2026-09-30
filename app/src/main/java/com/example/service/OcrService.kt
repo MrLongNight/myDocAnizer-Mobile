@@ -20,6 +20,7 @@ object OcrService {
      * Liest Textblöcke, Zeilen und Zeichenketten aus dem übergebenen Bitmap.
      */
     suspend fun recognizeText(bitmap: Bitmap, senderHint: String = "", titleHint: String = ""): String = withContext(Dispatchers.Default) {
+        val startTime = System.currentTimeMillis()
         try {
             val inputImage = InputImage.fromBitmap(bitmap, 0)
             val recognizedText = suspendCancellableCoroutine<String> { continuation ->
@@ -37,7 +38,7 @@ object OcrService {
                     }
             }
 
-            if (recognizedText.isNotBlank()) {
+            val finalResult = if (recognizedText.isNotBlank()) {
                 recognizedText
             } else {
                 buildString {
@@ -46,12 +47,19 @@ object OcrService {
                     append("Dokumenten-Scan erfasst.")
                 }
             }
+
+            val durationMs = System.currentTimeMillis() - startTime
+            AppAuditLogger.logOcr(finalResult.length, durationMs, finalResult.take(120))
+
+            finalResult
         } catch (e: Throwable) {
-            buildString {
+            val fallback = buildString {
                 if (senderHint.isNotBlank()) append("Absender: $senderHint\n")
                 if (titleHint.isNotBlank()) append("Titel: $titleHint\n")
                 append("Dokument erfasst.")
             }
+            AppAuditLogger.logError("OcrService", "Fehler bei OCR-Texterkennung: ${e.message}", e)
+            fallback
         }
     }
 }
