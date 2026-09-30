@@ -1,0 +1,48 @@
+# .github/CODEOWNERS
+# Code Ownership & Review Requirements
+
+# Global owner
+* @MrLongNight
+
+# Documentation
+*.md @MrLongNight
+docs/ @MrLongNight
+README.md @MrLongNight
+
+# Configuration & Build
+.github/ @MrLongNight
+gradle/ @MrLongNight
+build.gradle.kts @MrLongNight
+settings.gradle.kts @MrLongNight
+.env.example @MrLongNight
+
+# Core Application
+app/src/main/java/com/example/MainActivity.kt @MrLongNight
+
+# Security & Encryption
+app/src/main/java/com/example/service/CloudSyncWorkerService.kt @MrLongNight
+app/src/main/java/com/example/service/BiometricAuthManager.kt @MrLongNight
+app/src/main/java/com/example/service/DocumentStorageService.kt @MrLongNight
+
+# AI & Classification
+app/src/main/java/com/example/service/LlmService.kt @MrLongNight
+app/src/main/java/com/example/service/OcrService.kt @MrLongNight
+app/src/main/java/com/example/service/DocRuleRepository.kt @MrLongNight
+
+# UI/UX
+app/src/main/java/com/example/ui/DocAnizerViewModel.kt @MrLongNight
+app/src/main/java/com/example/ui/views/ @MrLongNight
+app/src/main/java/com/example/ui/components/ @MrLongNight
+app/src/main/java/com/example/ui/theme/ @MrLongNight
+
+# Data & Database
+app/src/main/java/com/example/data/ @MrLongNight
+app/src/main/java/com/example/model/ @MrLongNight
+
+# Tests
+app/src/test/ @MrLongNight
+app/src/androidTest/ @MrLongNight
+
+# Android Resources
+app/src/main/res/ @MrLongNight
+app/src/main/AndroidManifest.xml @MrLongNight
