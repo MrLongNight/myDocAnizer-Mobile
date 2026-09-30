@@ -1,0 +1,57 @@
+# .github/ISSUE_TEMPLATE/security.yml
+name: "🔐 Security Vulnerability"
+description: "Melde eine Sicherheitslücke (PRIVAT)"
+title: "[SECURITY] "
+labels: ["security", "critical"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        # 🔐 Sicherheitsmitteilung
+        
+        **WICHTIG:** Sicherheitslücken sollten NICHT öffentlich diskutiert werden!
+        
+        Bitte nutze stattdessen GitHub's Private Vulnerability Reporting:
+        1. Gehe zu Security → Advisories → Report a vulnerability
+        2. Oder kontaktiere @MrLongNight direkt
+
+  - type: textarea
+    attributes:
+      label: "Sicherheitslücke Beschreibung"
+      description: "Beschreibe die Sicherheitslücke"
+      placeholder: |
+        Typ: (z.B. SQL Injection, XSS, Datenleck, etc.)
+        Schweregrad: (Critical, High, Medium, Low)
+        Beschreibung: ...
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: "Proof of Concept (PoC)"
+      description: "Wie kann man die Lücke reproduzieren?"
+      render: kotlin
+
+  - type: textarea
+    attributes:
+      label: "Mögliche Auswirkungen"
+      description: "Welche Daten/Funktionen sind betroffen?"
+    validations:
+      required: true
+
+  - type: input
+    attributes:
+      label: "Kontakt"
+      description: "Wie können wir dich kontaktieren? (Email, Twitter, etc.)"
+    validations:
+      required: true
+
+  - type: checkboxes
+    attributes:
+      label: "Bestätigungen"
+      options:
+        - label: "Ich habe diese Lücke noch nicht öffentlich gemacht"
+          required: true
+        - label: "Ich benachrichtige das Team direkt"
+          required: true
