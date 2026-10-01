@@ -1080,6 +1080,7 @@ class LlmService(private val context: Context) {
      * Interaktive KI-Regelverfeinerung: Ermöglicht dem Nutzer, bestehende Regel-Vorschläge
      * durch natürliche Sprachanweisungen in Echtzeit anzupassen (z.B. neue Zusatzfelder,
      * geänderte Schlagwörter, Absender-Korrekturen).
+     * Nutzt den neuen Refine-Prompt (Maßnahme 3) mit striktem JSON-Schema.
      */
     suspend fun refineRuleSuggestion(
         currentRule: DocRule,
@@ -1090,48 +1091,56 @@ class LlmService(private val context: Context) {
         val startTime = System.currentTimeMillis()
         val activeModel = getSelectedModel()
         try {
-            val feedbackLower = userFeedbackPrompt.lowercase().trim()
+            val currentExtraction = DmsExtractionResponse(
+                reasoning = "Bestehende Regel: ${currentRule.name}",
+                absender = currentRule.detectedSender.takeIf { it.isNotBlank() },
+                dokumententyp = currentRule.targetDocType.takeIf { it.isNotBlank() },
+                matchKeywords = currentRule.matchKeywords,
+                kategorieVorschlag = currentRule.targetMainCategoryId,
+                globaleZusatzfelder = currentRule.targetCustomFields
+            )
+
+            val refinePrompt = """
+Aktuelle Daten:
+${currentExtraction.toJsonString()}
+
+OCR-Volltext:
+$ocrText
+
+Nutzer-Anweisung:
+$userFeedbackPrompt
+
+Aufgabe: Passe die Extraktion strikt nach der Anweisung des Nutzers an.
+Antworte AUSSCHLIESSLICH im selben JSON-Format wie zuvor, aktualisiere die Werte und füge bei Bedarf neue 'globale_zusatzfelder' hinzu.
+""".trimIndent()
+
+            val modelFile = getModelFile(activeModel.id)
+            val rawOutput = llamaCppEngine.executeInference(
+                modelFile = modelFile,
+                prompt = refinePrompt,
+                systemPrompt = LlamaCppInferenceEngine.BASE_SYSTEM_PROMPT,
+                params = LlamaCppInferenceEngine.InferenceParams(
+                    temperature = 0.1f,
+                    grammar = LlamaCppInferenceEngine.DMS_JSON_GBNF
+                )
+            )
+
+            val parsed = llamaCppEngine.parseDmsJson(rawOutput, ocrText)
+
             val newCustomFields = currentRule.targetCustomFields.toMutableMap()
-            var newName = currentRule.name
-            var newSender = currentRule.detectedSender
-            var newDocType = currentRule.targetDocType
-            var newMainCat = currentRule.targetMainCategoryId
+            newCustomFields.putAll(parsed.globaleZusatzfelder)
+
+            var newSender = parsed.absender ?: currentRule.detectedSender
+            var newDocType = parsed.dokumententyp ?: currentRule.targetDocType
+            var newMainCat = parsed.kategorieVorschlag ?: currentRule.targetMainCategoryId
             var newSubCat = currentRule.targetSubCategoryId
-            val newKeywords = currentRule.matchKeywords.toMutableList()
+            val newKeywords = if (parsed.matchKeywords.isNotEmpty()) parsed.matchKeywords.toMutableList() else currentRule.matchKeywords.toMutableList()
             val newTags = currentRule.targetTags.toMutableList()
 
-            // 1. Spezifische Anweisungen für Kennzeichen
-            val platePattern = Regex("\\b([A-ZÄÖÜ]{1,3}[ -][A-Z]{1,2}[ -]?[0-9]{1,4})\\b")
-            val foundPlate = platePattern.find(userFeedbackPrompt) ?: platePattern.find(ocrText)
-            if (foundPlate != null || feedbackLower.contains("kennzeichen")) {
-                newCustomFields["Amtl. Kennzeichen"] = foundPlate?.groupValues?.get(1) ?: "Kennzeichen"
-                if (!newTags.contains("#kfz")) newTags.add("#kfz")
-            }
+            // Direkte Keyword-/Feld-Analyse aus dem Nutzer-Prompt
+            val feedbackLower = userFeedbackPrompt.lowercase().trim()
 
-            // 2. Fälligkeit / Fristen
-            if (feedbackLower.contains("fällig") || feedbackLower.contains("frist")) {
-                val due = extractDueDateFromText(userFeedbackPrompt).ifBlank { extractDueDateFromText(ocrText) }
-                if (due.isNotBlank()) newCustomFields["Fälligkeit"] = due
-            }
-
-            // 3. Betragsanweisungen
-            if (feedbackLower.contains("betrag") || feedbackLower.contains("summe") || feedbackLower.contains("preis")) {
-                val amt = extractAmountFromText(userFeedbackPrompt).ifBlank { extractAmountFromText(ocrText) }
-                if (amt.isNotBlank()) newCustomFields["Rechnungsbetrag"] = amt
-            }
-
-            // 4. Absender-Korrektur
-            if (feedbackLower.contains("absender") || feedbackLower.contains("firma") || feedbackLower.contains("von ")) {
-                val words = userFeedbackPrompt.split(" ")
-                val fromIdx = words.indexOfFirst { it.equals("von", ignoreCase = true) || it.equals("absender", ignoreCase = true) }
-                if (fromIdx != -1 && fromIdx + 1 < words.size) {
-                    val rawSender = words.subList(fromIdx + 1, (fromIdx + 3).coerceAtMost(words.size)).joinToString(" ")
-                    newSender = rawSender.replace(Regex("[^a-zA-Z0-9äöüÄÖÜß\\s\\-]"), "").trim()
-                    newName = "$newSender $newDocType"
-                }
-            }
-
-            // 5. Schlüssel-Wert Paare im Format "Key: Value" oder "Feld: Wert"
+            // 1. Schlüssel-Wert Paare im Format "Key: Value" oder "Feld: Wert"
             val keyValuePattern = Regex("([A-Za-z0-9äöüÄÖÜß\\s\\-_/]{2,25})\\s*[:=]\\s*([A-Za-z0-9äöüÄÖÜß\\s\\-_/.€,]{1,40})")
             keyValuePattern.findAll(userFeedbackPrompt).forEach { match ->
                 val k = match.groupValues[1].trim()
@@ -1141,7 +1150,17 @@ class LlmService(private val context: Context) {
                 }
             }
 
-            // 6. Dokumenttyp-Wechsel
+            // 2. Absender-Korrektur
+            if (feedbackLower.contains("absender") || feedbackLower.contains("firma") || feedbackLower.contains("von ")) {
+                val words = userFeedbackPrompt.split(" ")
+                val fromIdx = words.indexOfFirst { it.equals("von", ignoreCase = true) || it.equals("absender", ignoreCase = true) }
+                if (fromIdx != -1 && fromIdx + 1 < words.size) {
+                    val rawSender = words.subList(fromIdx + 1, (fromIdx + 3).coerceAtMost(words.size)).joinToString(" ")
+                    newSender = rawSender.replace(Regex("[^a-zA-Z0-9äöüÄÖÜß\\s\\-]"), "").trim()
+                }
+            }
+
+            // 3. Dokumenttyp-Wechsel
             when {
                 feedbackLower.contains("vertrag") -> {
                     newDocType = "Vertrag"
@@ -1170,14 +1189,22 @@ class LlmService(private val context: Context) {
                 }
             }
 
+            // Maßnahme 2: Regel-Name deterministisch via Kotlin-Logik berechnen (Entlastung des LLMs)
+            val newName = when {
+                newSender.isNotBlank() && newDocType.isNotBlank() -> "$newSender $newDocType"
+                newSender.isNotBlank() -> "$newSender Dokument"
+                newDocType.isNotBlank() -> "$newDocType Ablage"
+                else -> currentRule.name
+            }
+
             val (icon, logo) = com.example.ui.components.detectSuggestedLogoAndIcon(newSender, userFeedbackPrompt + " " + ocrText, newMainCat)
 
             val latency = System.currentTimeMillis() - startTime
             AppAuditLogger.log(
                 category = LogCategory.AI_INFERENCE,
                 tag = "RuleRefinement",
-                message = "Regel '${currentRule.name}' via Nutzer-Prompt verfeinert (${latency}ms)",
-                details = "Modell: ${activeModel.id} | Prompt: \"$userFeedbackPrompt\" | Neue Felder: ${newCustomFields.size}"
+                message = "Regel '$newName' via Chain-of-Thought JSON-Prompt verfeinert (${latency}ms)",
+                details = "Modell: ${activeModel.id} | Prompt: \"$userFeedbackPrompt\" | Neue Felder: ${newCustomFields.size} | Reasoning: ${parsed.reasoning.take(120)}"
             )
 
             currentRule.copy(

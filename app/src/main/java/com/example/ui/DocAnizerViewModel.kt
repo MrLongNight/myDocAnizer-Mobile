@@ -2021,8 +2021,19 @@ class DocAnizerViewModel(application: Application) : AndroidViewModel(applicatio
 
                     val (suggestedIcon, suggestedLogo) = com.example.ui.components.detectSuggestedLogoAndIcon(aiClass.sender, ocrText, aiClass.mainCategoryId)
 
+                    // Maßnahme 2: Kotlin-Logik für Regel-Benennung (Entlastung des LLMs)
+                    val cleanSender = aiClass.sender.trim().takeIf { it.isNotBlank() && it != "null" }
+                    val cleanType = aiClass.docType.trim().takeIf { it.isNotBlank() && it != "null" }
+                    val ruleName = when {
+                        cleanSender != null && cleanType != null -> "$cleanSender $cleanType"
+                        cleanSender != null -> "$cleanSender Dokument"
+                        cleanType != null -> "$cleanType Ablage"
+                        aiClass.title.isNotBlank() -> aiClass.title
+                        else -> "Neues Dokument"
+                    }
+
                     val suggestedRule = com.example.model.DocRule(
-                        name = aiClass.title.ifBlank { "Scan ${aiClass.sender}" },
+                        name = ruleName,
                         matchKeywords = smartKeywords,
                         targetMainCategoryId = aiClass.mainCategoryId,
                         targetSubCategoryId = aiClass.subCategoryId,
