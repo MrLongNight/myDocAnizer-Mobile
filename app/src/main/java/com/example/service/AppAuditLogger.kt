@@ -317,7 +317,7 @@ object AppAuditLogger {
             writer.write("Erstellt am:   $prettyDate\n")
             writer.write("Datenschutz:   100% On-Device Audit-Log (Vollständig offline)\n")
             writer.write("Gerät:         ${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL} (Android ${android.os.Build.VERSION.RELEASE})\n")
-            writer.write("App-Version:   myDocAnizer-Mobile v1.1\n")
+            writer.write("App-Version:   myDocAnizer-Mobile v2.0.0\n")
             writer.write("--------------------------------------------------------------------------------\n")
             writer.write("ÜBERSICHT & STATUS:\n")
             writer.write("  • Gesamt-Ereignisse: $totalCount\n")

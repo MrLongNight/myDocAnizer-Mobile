@@ -141,6 +141,8 @@ class LlmService(private val context: Context) {
             context.cacheDir
         }
 
+    val llamaCppEngine = LlamaCppInferenceEngine(context)
+
     private val httpClient by lazy {
         OkHttpClient.Builder()
             .connectTimeout(30, TimeUnit.SECONDS)
@@ -423,6 +425,93 @@ class LlmService(private val context: Context) {
                 isNewRelease = false,
                 releaseDate = "2026.02",
                 modelCategory = "Finanzen & Tabellen"
+            ),
+            HuggingFaceModelInfo(
+                id = "nuextract-2-2b-gguf",
+                name = "NuExtract 2.0 2B (DMS Extraktion)",
+                author = "NuMind / aman2024",
+                quantFormat = "Q4_K_M (GGUF)",
+                downloadSizeMb = 1450,
+                parameterSize = "2.0 Mrd",
+                recommendedRamGb = 4.5f,
+                ramBadge = "4 – 6 GB RAM",
+                descriptionDe = "Hochspezialisiertes On-Device Modell für strukturierte Beleg- & Rechnungsextraktion. Liest Beträge, IBAN, Rechnungsnummern und Fristen nach vordefinierten Schemas aus.",
+                criteria = listOf(
+                    "Spezialist: Rechnungs-, Beleg- & Formular-Extraktion",
+                    "Schema: Striktes JSON-Parsing ohne Halluzinationen",
+                    "Latenz: Schnell (~380 ms via Vulkan/NEON)"
+                ),
+                compatibilityLevel = calculateCompatibility(4.5f, hw),
+                isHardwareRecommended = (hw.totalRamGb >= 4.0f && hw.totalRamGb < 6.0f),
+                hardwareRecommendationReason = "Exzellente Spezialisierung für deutsche Rechnungen und DMS-Workflows.",
+                downloadUrl = "https://huggingface.co/aman2024/NuExtract-2-2B-GGUF/resolve/main/NuExtract-2-2B-Q4_K_M.gguf",
+                fileName = "NuExtract-2-2B-Q4_K_M.gguf",
+                isDownloaded = isModelPhysicallyOnDisk("NuExtract-2-2B-Q4_K_M.gguf"),
+                localFileSizeBytes = getModelDiskSize("NuExtract-2-2B-Q4_K_M.gguf"),
+                isSelected = false,
+                isCuratedApproved = true,
+                approvalStatus = "Verifiziert für Rechnungen & Quittungen",
+                isNewRelease = true,
+                releaseDate = "2026.03",
+                modelCategory = "DMS & Rechnungsextraktion"
+            ),
+            HuggingFaceModelInfo(
+                id = "distil-qwen-0.8b-invoice-triage-gguf",
+                name = "Distil-Qwen 0.8B Invoice Triage",
+                author = "distil-labs",
+                quantFormat = "Q4_K_M (GGUF)",
+                downloadSizeMb = 580,
+                parameterSize = "800 Mio",
+                recommendedRamGb = 2.5f,
+                ramBadge = "2.5 – 4 GB RAM",
+                descriptionDe = "Ultraschlankes, feingetuntes Spezialmodell zur automatischen Beleg- und Rechnungstriage. Klassifiziert Posteingänge präzise in Rechnung, Quittung, Mahnung oder Vertrag.",
+                criteria = listOf(
+                    "Fokus: Blitzschnelle Posteingangs-Klassifikation",
+                    "Ressourcen: Extrem geringer Speicher- & Akkubedarf",
+                    "Latenz: Ultraschnell (< 180 ms)"
+                ),
+                compatibilityLevel = calculateCompatibility(2.5f, hw),
+                isHardwareRecommended = false,
+                hardwareRecommendationReason = "Geringer RAM-Bedarf, ideal für Posteingangs-Triage.",
+                downloadUrl = "https://huggingface.co/distil-labs/distil-qwen3.5-0.8b-invoice-triage-gguf/resolve/main/distil-qwen3.5-0.8b-invoice-triage-Q4_K_M.gguf",
+                fileName = "distil-qwen3.5-0.8b-invoice-triage-Q4_K_M.gguf",
+                isDownloaded = isModelPhysicallyOnDisk("distil-qwen3.5-0.8b-invoice-triage-Q4_K_M.gguf"),
+                localFileSizeBytes = getModelDiskSize("distil-qwen3.5-0.8b-invoice-triage-Q4_K_M.gguf"),
+                isSelected = false,
+                isCuratedApproved = true,
+                approvalStatus = "Verifiziert für Triage & Sortierung",
+                isNewRelease = true,
+                releaseDate = "2026.03",
+                modelCategory = "DMS & Rechnungsextraktion"
+            ),
+            HuggingFaceModelInfo(
+                id = "lift-4b-structured-gguf",
+                name = "LIFT 4B Structured PDF Extractor",
+                author = "Datalab / prithivMLmods",
+                quantFormat = "Q4_K_M (GGUF)",
+                downloadSizeMb = 2450,
+                parameterSize = "4.0 Mrd",
+                recommendedRamGb = 6.0f,
+                ramBadge = "6 – 8 GB RAM",
+                descriptionDe = "Spezialisiert auf JSON-Schema-Extraktion aus PDFs und Dokumenten. Extrahiert Tabellen, Einzelpositionen und steuerliche Metadaten fehlerfrei.",
+                criteria = listOf(
+                    "Tabellen: Komplexe mehrzeilige Rechnungspositionen",
+                    "Genauigkeit: Höchste Detailtreue bei PDF-Berichten",
+                    "Latenz: Gründlich (~550 ms)"
+                ),
+                compatibilityLevel = calculateCompatibility(6.0f, hw),
+                isHardwareRecommended = (hw.totalRamGb >= 6.0f),
+                hardwareRecommendationReason = "Empfohlen für High-End-Smartphones mit komplexen Tabellendokumenten.",
+                downloadUrl = "https://huggingface.co/prithivMLmods/lift-GGUF/resolve/main/lift-4B-Q4_K_M.gguf",
+                fileName = "lift-4B-Q4_K_M.gguf",
+                isDownloaded = isModelPhysicallyOnDisk("lift-4B-Q4_K_M.gguf"),
+                localFileSizeBytes = getModelDiskSize("lift-4B-Q4_K_M.gguf"),
+                isSelected = false,
+                isCuratedApproved = true,
+                approvalStatus = "Verifiziert für PDF-Tabellen",
+                isNewRelease = true,
+                releaseDate = "2026.03",
+                modelCategory = "Tabellen & PDF Extraktion"
             )
         )
         return baseList
