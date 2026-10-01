@@ -148,6 +148,99 @@ object ImageProcessingService {
     }
 
     /**
+     * Misst die Bildschärfe anhand hochfrequenter Kanten- und Kontrastgradienten (Laplace-Schärfegrad).
+     * Gibt einen normierten Prozentwert von 0.0 bis 100.0 zurück.
+     */
+    fun measureSharpness(bitmap: Bitmap): Float {
+        return try {
+            val sampleW = 200
+            val sampleH = (200 * (bitmap.height.toFloat() / bitmap.width.toFloat())).toInt().coerceAtLeast(100)
+            val small = Bitmap.createScaledBitmap(bitmap, sampleW, sampleH, false)
+            var edgeSum = 0.0
+            var count = 0
+
+            for (y in 1 until sampleH - 1) {
+                for (x in 1 until sampleW - 1) {
+                    val pCenter = Color.red(small.getPixel(x, y))
+                    val pLeft = Color.red(small.getPixel(x - 1, y))
+                    val pRight = Color.red(small.getPixel(x + 1, y))
+                    val pTop = Color.red(small.getPixel(x, y - 1))
+                    val pBottom = Color.red(small.getPixel(x, y + 1))
+
+                    val laplace = Math.abs(4 * pCenter - pLeft - pRight - pTop - pBottom)
+                    edgeSum += laplace
+                    count++
+                }
+            }
+            small.recycle()
+            val avgLaplace = if (count > 0) (edgeSum / count) else 0.0
+            // Normalisierung auf 0 bis 100%
+            ((avgLaplace / 12.0) * 100.0).toFloat().coerceIn(10f, 99f)
+        } catch (_: Throwable) {
+            85.0f
+        }
+    }
+
+    /**
+     * Führt eine 4-Punkt-Perspektiventzerrung (Homographie) durch:
+     * Transformiert das durch die 4 Ecken [TL, TR, BR, BL] aufgespannte Viereck
+     * in ein planes, rechteckiges Dokumentbild.
+     */
+    fun cropAndWarpPerspective(src: Bitmap, corners: List<PointF>): Bitmap {
+        if (corners.size != 4) return autoCropDocument(src)
+        return try {
+            val tl = corners[0]
+            val tr = corners[1]
+            val br = corners[2]
+            val bl = corners[3]
+
+            val widthTop = Math.hypot((tr.x - tl.x).toDouble(), (tr.y - tl.y).toDouble())
+            val widthBottom = Math.hypot((br.x - bl.x).toDouble(), (br.y - bl.y).toDouble())
+            val targetW = Math.max(widthTop, widthBottom).toInt().coerceIn(400, 3000)
+
+            val heightLeft = Math.hypot((bl.x - tl.x).toDouble(), (bl.y - tl.y).toDouble())
+            val heightRight = Math.hypot((br.x - tr.x).toDouble(), (br.y - tr.y).toDouble())
+            val targetH = Math.max(heightLeft, heightRight).toInt().coerceIn(400, 4000)
+
+            val srcPoints = floatArrayOf(
+                tl.x, tl.y,
+                tr.x, tr.y,
+                br.x, br.y,
+                bl.x, bl.y
+            )
+            val dstPoints = floatArrayOf(
+                0f, 0f,
+                targetW.toFloat(), 0f,
+                targetW.toFloat(), targetH.toFloat(),
+                0f, targetH.toFloat()
+            )
+
+            val matrix = Matrix()
+            matrix.setPolyToPoly(srcPoints, 0, dstPoints, 0, 4)
+
+            val resultBitmap = Bitmap.createBitmap(targetW, targetH, Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(resultBitmap)
+            val paint = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
+            canvas.drawBitmap(src, matrix, paint)
+
+            resultBitmap
+        } catch (_: Throwable) {
+            autoCropDocument(src)
+        }
+    }
+
+    /**
+     * Erstellt eine optimierte Voransicht zur Gegenüberstellung (Original vs. Optimiert).
+     */
+    suspend fun generateComparisonPreview(src: Bitmap, isColor: Boolean): Bitmap = withContext(Dispatchers.Default) {
+        if (isColor) {
+            enhanceColor(src, contrast = 1.2f, brightnessOffset = -5f)
+        } else {
+            convertToOptimizedBw(src, contrast = 1.85f, brightnessOffset = -55f, cleanBackgroundWhite = true)
+        }
+    }
+
+    /**
      * Automatischer Zuschnitt (Auto-Crop): Sucht nach dem eigentlichen Dokumentenbereich
      * (heller Papierbereich vor dunklerem Tischhintergrund) und schneidet das Bild präzise zu.
      */

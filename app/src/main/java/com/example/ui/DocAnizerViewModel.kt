@@ -942,6 +942,12 @@ class DocAnizerViewModel(application: Application) : AndroidViewModel(applicatio
         return llmService.generateRulesFromPrompt(userDescription)
     }
 
+    suspend fun refineRuleSuggestion(currentRule: com.example.model.DocRule, userFeedbackPrompt: String, ocrText: String): com.example.model.DocRule {
+        return llmService.refineRuleSuggestion(currentRule, userFeedbackPrompt, ocrText)
+    }
+
+    val modelBenchmarks = com.example.service.AppAuditLogger.modelBenchmarks
+
     // Dark/Light Theme: "SYSTEM", "DARK", "LIGHT"
     val themeMode: StateFlow<String> = settingsRepo.themeMode
 
@@ -2017,12 +2023,12 @@ class DocAnizerViewModel(application: Application) : AndroidViewModel(applicatio
                         bitmap = processed,
                         ocrText = ocrText,
                         suggestedRule = suggestedRule,
-                        onSingleUseOnly = {
+                        onSingleUseOnly = { finalRule ->
                             _pendingRuleSuggestion.value = null
                             saveProcessedBitmapWithRule(
                                 bitmap = processed,
                                 ocrText = ocrText,
-                                rule = suggestedRule,
+                                rule = finalRule,
                                 isColor = isColor,
                                 onComplete = onComplete
                             )

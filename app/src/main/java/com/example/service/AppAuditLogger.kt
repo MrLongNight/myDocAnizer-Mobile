@@ -25,6 +25,17 @@ enum class LogCategory(val label: String, val icon: String) {
     ERROR("Fehler", "🚨")
 }
 
+data class ModelBenchmarkStats(
+    val modelId: String,
+    val modelName: String,
+    val totalInferences: Int = 0,
+    val avgLatencyMs: Long = 0L,
+    val avgConfidence: Float = 0f,
+    val avgFieldsExtracted: Float = 0f,
+    val peakRamDeltaMb: Float = 0f,
+    val lastUsedTimestamp: Long = System.currentTimeMillis()
+)
+
 data class AuditLogEntry(
     val id: String = UUID.randomUUID().toString(),
     val timestamp: Long = System.currentTimeMillis(),
@@ -32,7 +43,11 @@ data class AuditLogEntry(
     val tag: String,
     val message: String,
     val details: String = "",
-    val isError: Boolean = false
+    val isError: Boolean = false,
+    val modelId: String? = null,
+    val latencyMs: Long? = null,
+    val ramDeltaMb: Float? = null,
+    val reasoningTrace: String? = null
 ) {
     val formattedTime: String
         get() = SimpleDateFormat("dd.MM.yyyy HH:mm:ss.SSS", Locale.GERMAN).format(Date(timestamp))
@@ -40,7 +55,8 @@ data class AuditLogEntry(
     fun toLogLine(): String {
         val errPrefix = if (isError) "[🚨 ERROR] " else ""
         val detailsStr = if (details.isNotBlank()) " | Details: $details" else ""
-        return "[$formattedTime] [${category.icon} ${category.name}] [$tag] $errPrefix$message$detailsStr"
+        val hwStr = if (ramDeltaMb != null && latencyMs != null) " [RAM-Δ: ${ramDeltaMb}MB, Latenz: ${latencyMs}ms]" else ""
+        return "[$formattedTime] [${category.icon} ${category.name}] [$tag]$hwStr $errPrefix$message$detailsStr"
     }
 
     fun toFormattedBlock(): String {
@@ -50,6 +66,15 @@ data class AuditLogEntry(
         sb.append("   ↳ Status:  $message\n")
         if (details.isNotBlank()) {
             sb.append("   ↳ Details: $details\n")
+        }
+        if (!reasoningTrace.isNullOrBlank()) {
+            sb.append("   ↳ KI-Gedankengang (Reasoning Trace):\n")
+            reasoningTrace.lines().forEach { line ->
+                sb.append("     │ $line\n")
+            }
+        }
+        if (ramDeltaMb != null || latencyMs != null) {
+            sb.append("   ↳ Hardware-Ressourcen: RAM-Verbrauch: ${ramDeltaMb ?: 0f} MB | Laufzeit: ${latencyMs ?: 0L} ms\n")
         }
         sb.append("--------------------------------------------------------------------------------\n")
         return sb.toString()
@@ -69,6 +94,9 @@ object AppAuditLogger {
 
     private val _logs = MutableStateFlow<List<AuditLogEntry>>(emptyList())
     val logs: StateFlow<List<AuditLogEntry>> = _logs.asStateFlow()
+
+    private val _modelBenchmarks = MutableStateFlow<Map<String, ModelBenchmarkStats>>(emptyMap())
+    val modelBenchmarks: StateFlow<Map<String, ModelBenchmarkStats>> = _modelBenchmarks.asStateFlow()
 
     private var appContext: Context? = null
     private val scope = CoroutineScope(Dispatchers.IO)
@@ -131,14 +159,56 @@ object AppAuditLogger {
         confidence: Float,
         latencyMs: Long,
         customFieldsCount: Int,
-        reasoningSnippet: String
+        reasoningSnippet: String,
+        ramDeltaMb: Float = 0f,
+        fullReasoning: String = ""
     ) {
-        log(
+        val entry = AuditLogEntry(
             category = LogCategory.AI_INFERENCE,
             tag = "InferenceEngine",
-            message = "Dokument als '$docType' ($sender) eingestuft",
-            details = "Modell: $modelId | Latenz: ${latencyMs}ms | Konfidenz: ${(confidence * 100).toInt()}% | Zusatzfelder: $customFieldsCount | Begründung: $reasoningSnippet"
+            message = "Dokument als '$docType' ($sender) eingestuft (${(confidence * 100).toInt()}% Konfidenz)",
+            details = "Modell: $modelId | Latenz: ${latencyMs}ms | RAM-Δ: ${ramDeltaMb}MB | Felder: $customFieldsCount | Auszug: $reasoningSnippet",
+            modelId = modelId,
+            latencyMs = latencyMs,
+            ramDeltaMb = ramDeltaMb,
+            reasoningTrace = if (fullReasoning.isNotBlank()) fullReasoning else reasoningSnippet
         )
+
+        val current = _logs.value.toMutableList()
+        current.add(0, entry)
+        if (current.size > MAX_MEMORY_LOGS) {
+            current.removeAt(current.size - 1)
+        }
+        _logs.value = current
+
+        // Benchmark-Statistik pro Modell aktualisieren
+        val currentBenchmarks = _modelBenchmarks.value.toMutableMap()
+        val prev = currentBenchmarks[modelId] ?: ModelBenchmarkStats(
+            modelId = modelId,
+            modelName = modelId
+        )
+        val newTotal = prev.totalInferences + 1
+        val newAvgLatency = ((prev.avgLatencyMs * prev.totalInferences) + latencyMs) / newTotal
+        val newAvgConf = ((prev.avgConfidence * prev.totalInferences) + confidence) / newTotal
+        val newAvgFields = ((prev.avgFieldsExtracted * prev.totalInferences) + customFieldsCount) / newTotal
+        val peakRam = maxOf(prev.peakRamDeltaMb, ramDeltaMb)
+
+        currentBenchmarks[modelId] = prev.copy(
+            totalInferences = newTotal,
+            avgLatencyMs = newAvgLatency,
+            avgConfidence = newAvgConf,
+            avgFieldsExtracted = newAvgFields,
+            peakRamDeltaMb = peakRam,
+            lastUsedTimestamp = System.currentTimeMillis()
+        )
+        _modelBenchmarks.value = currentBenchmarks
+
+        val ctx = appContext
+        if (ctx != null) {
+            scope.launch {
+                appendToFile(ctx, entry)
+            }
+        }
     }
 
     fun logOcr(charCount: Int, durationMs: Long, preview: String) {

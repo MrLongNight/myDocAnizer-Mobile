@@ -105,204 +105,10 @@ fun SettingsView(
             .background(MaterialTheme.colorScheme.background)
             .testTag("settings_view")
     ) {
-        // 3-STUFIGE ANSICHTS-AUSWAHL (STANDARD / ERWEITERT / EXPERTE)
-        Surface(
-            color = when (appViewLevel) {
-                AppViewLevel.STANDARD -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
-                AppViewLevel.ADVANCED -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.25f)
-                AppViewLevel.EXPERT -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.25f)
-            },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Icon(
-                            imageVector = when (appViewLevel) {
-                                AppViewLevel.STANDARD -> Icons.Default.Visibility
-                                AppViewLevel.ADVANCED -> Icons.Default.Tune
-                                AppViewLevel.EXPERT -> Icons.Default.Build
-                            },
-                            contentDescription = null,
-                            tint = when (appViewLevel) {
-                                AppViewLevel.STANDARD -> MaterialTheme.colorScheme.primary
-                                AppViewLevel.ADVANCED -> MaterialTheme.colorScheme.secondary
-                                AppViewLevel.EXPERT -> MaterialTheme.colorScheme.tertiary
-                            },
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Text(
-                            text = "Ansichts-Ebene:",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
-                    // 3 FilterChips nebeneinander
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        FilterChip(
-                            selected = appViewLevel == AppViewLevel.STANDARD,
-                            onClick = { viewModel.setAppViewLevel(AppViewLevel.STANDARD) },
-                            label = { Text("Standard", style = MaterialTheme.typography.labelSmall) },
-                            leadingIcon = if (appViewLevel == AppViewLevel.STANDARD) {
-                                { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(14.dp)) }
-                            } else null,
-                            modifier = Modifier.testTag("chip_view_standard")
-                        )
-                        FilterChip(
-                            selected = appViewLevel == AppViewLevel.ADVANCED,
-                            onClick = { viewModel.setAppViewLevel(AppViewLevel.ADVANCED) },
-                            label = { Text("Erweitert", style = MaterialTheme.typography.labelSmall) },
-                            leadingIcon = if (appViewLevel == AppViewLevel.ADVANCED) {
-                                { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(14.dp)) }
-                            } else null,
-                            modifier = Modifier.testTag("chip_view_advanced")
-                        )
-                        FilterChip(
-                            selected = appViewLevel == AppViewLevel.EXPERT,
-                            onClick = { viewModel.setAppViewLevel(AppViewLevel.EXPERT) },
-                            label = { Text("Experte", style = MaterialTheme.typography.labelSmall) },
-                            leadingIcon = if (appViewLevel == AppViewLevel.EXPERT) {
-                                { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(14.dp)) }
-                            } else null,
-                            modifier = Modifier.testTag("chip_view_expert")
-                        )
-                    }
-                }
-
-                // Dynamische Kurzbeschreibung der aktiven Ebene
-                Text(
-                    text = when (appViewLevel) {
-                        AppViewLevel.STANDARD -> "🟢 Standard: Fokussiert & übersichtlich. Technische Details optimal vorkonfiguriert."
-                        AppViewLevel.ADVANCED -> "🟡 Erweitert: Mehr Optionen für Workflows, Vorlagen & flexible Synchronisation."
-                        AppViewLevel.EXPERT -> "🔴 Experte: Voller Zugriff auf Inferenz-Parameter, SQLite WAL-Wartung & Netzwerk."
-                    },
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-
-        // MANUELLER START DES KONFIGURATIONS-ASSISTENTEN
-        Surface(
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.AutoAwesome,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Column {
-                        Text(
-                            text = "Anpassung der App-Konfig",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "Speicherort, Scanner, KI & Backup geführt durchgehen",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-
-                OutlinedButton(
-                    onClick = { viewModel.launchSetupWizardManually() },
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                    modifier = Modifier.testTag("btn_launch_wizard_manual")
-                ) {
-                    Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Assistent starten", style = MaterialTheme.typography.labelSmall)
-                }
-            }
-        }
-
-        // MANUELLER START DES PC- & SCANNER-ASSISTENTEN
-        Surface(
-            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Computer,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Column {
-                        Text(
-                            text = "PC- & Scanner-Anbindung",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "Am PC scannen, Web-Portal & Watchfolder einrichten",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-
-                Button(
-                    onClick = { viewModel.launchPcCompanionWizard() },
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                    modifier = Modifier.testTag("btn_launch_pc_wizard")
-                ) {
-                    Icon(Icons.Default.Link, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("PC-Assistent", style = MaterialTheme.typography.labelSmall)
-                }
-            }
-        }
-
-        // Tab-Leiste für Einstellungen mit dynamischen Pfeilen & Direkt-Übersicht
+        // KOMPAKTE, ELEGANTE KOPFZEILE (Ebene & Assistenten-Schnellzugriff)
         Surface(
             color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 2.dp,
+            tonalElevation = 1.dp,
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.fillMaxWidth()) {
@@ -313,180 +119,117 @@ fun SettingsView(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    // Ebene-Umschalter als schlanke FilterChips
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        Icon(
-                            imageVector = tabs[selectedSettingsTab].icon,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(16.dp)
+                        FilterChip(
+                            selected = appViewLevel == AppViewLevel.STANDARD,
+                            onClick = { viewModel.setAppViewLevel(AppViewLevel.STANDARD) },
+                            label = { Text("Standard", fontSize = 11.sp) },
+                            leadingIcon = if (appViewLevel == AppViewLevel.STANDARD) {
+                                { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(12.dp)) }
+                            } else null,
+                            modifier = Modifier.height(30.dp).testTag("chip_view_standard")
                         )
-                        Text(
-                            text = tabs[selectedSettingsTab].title,
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
+                        FilterChip(
+                            selected = appViewLevel == AppViewLevel.ADVANCED,
+                            onClick = { viewModel.setAppViewLevel(AppViewLevel.ADVANCED) },
+                            label = { Text("Erweitert", fontSize = 11.sp) },
+                            leadingIcon = if (appViewLevel == AppViewLevel.ADVANCED) {
+                                { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(12.dp)) }
+                            } else null,
+                            modifier = Modifier.height(30.dp).testTag("chip_view_advanced")
+                        )
+                        FilterChip(
+                            selected = appViewLevel == AppViewLevel.EXPERT,
+                            onClick = { viewModel.setAppViewLevel(AppViewLevel.EXPERT) },
+                            label = { Text("Experte", fontSize = 11.sp) },
+                            leadingIcon = if (appViewLevel == AppViewLevel.EXPERT) {
+                                { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(12.dp)) }
+                            } else null,
+                            modifier = Modifier.height(30.dp).testTag("chip_view_expert")
                         )
                     }
 
-                    OutlinedButton(
+                    // Assistenten & Übersicht Button
+                    FilledTonalButton(
                         onClick = { showSectionOverviewDialog = true },
                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
                         modifier = Modifier
-                            .height(28.dp)
+                            .height(30.dp)
                             .testTag("btn_all_settings_tabs")
                     ) {
                         Icon(
-                            imageVector = Icons.Default.GridView,
+                            imageVector = Icons.Default.AutoAwesome,
                             contentDescription = null,
                             modifier = Modifier.size(14.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Alle 9 Bereiche auf einen Blick", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text("Assistenten", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
                 }
 
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
-                    contentAlignment = Alignment.CenterStart
-                ) {
-                // Scrollbare Tabs
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(tabScrollState)
-                        .padding(horizontal = 42.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                // NATIVE MATERIAL 3 SCROLLABLE TAB ROW
+                ScrollableTabRow(
+                    selectedTabIndex = selectedSettingsTab,
+                    edgePadding = 8.dp,
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    contentColor = MaterialTheme.colorScheme.primary,
+                    divider = { HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f)) },
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     tabs.forEachIndexed { index, tab ->
                         val isSelected = selectedSettingsTab == index
-                        FilterChip(
+                        Tab(
                             selected = isSelected,
                             onClick = { selectedSettingsTab = index },
-                            label = {
+                            text = {
                                 Text(
                                     text = tab.title,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                    fontSize = 13.sp
+                                    fontSize = 12.sp
                                 )
                             },
-                            leadingIcon = {
+                            icon = {
                                 Icon(
                                     imageVector = tab.icon,
                                     contentDescription = null,
                                     modifier = Modifier.size(16.dp)
                                 )
                             },
-                            shape = RoundedCornerShape(12.dp),
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                                selectedLeadingIconColor = MaterialTheme.colorScheme.primary
-                            ),
-                            modifier = Modifier
-                                .height(46.dp)
-                                .testTag("settings_tab_$index")
+                            modifier = Modifier.testTag("settings_tab_$index")
                         )
                     }
                 }
 
-                // Dynamischer Pfeil LINKS (sichtbar wenn noch Tabs nach links verborgen sind)
-                androidx.compose.animation.AnimatedVisibility(
-                    visible = tabScrollState.canScrollBackward,
-                    enter = fadeIn() + slideInHorizontally { -it },
-                    exit = fadeOut() + slideOutHorizontally { -it },
-                    modifier = Modifier
-                        .align(Alignment.CenterStart)
-                        .fillMaxHeight()
+                // Subtile Status-Info zur aktiven Ansichtsebene
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Box(
+                    Row(
                         modifier = Modifier
-                            .fillMaxHeight()
-                            .width(52.dp)
-                            .background(
-                                Brush.horizontalGradient(
-                                    colors = listOf(
-                                        MaterialTheme.colorScheme.surface,
-                                        MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
-                                        Color.Transparent
-                                    )
-                                )
-                            ),
-                        contentAlignment = Alignment.CenterStart
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        FilledTonalIconButton(
-                            onClick = {
-                                scope.launch {
-                                    val target = (tabScrollState.value - 240).coerceAtLeast(0)
-                                    tabScrollState.animateScrollTo(target)
-                                }
+                        Text(
+                            text = when (appViewLevel) {
+                                AppViewLevel.STANDARD -> "🌿 Standard-Ansicht: Aufgeräumt & intuitiv für den Alltag"
+                                AppViewLevel.ADVANCED -> "⚙️ Erweiterte Ansicht: Alle Bildfilter & Formate aktiv"
+                                AppViewLevel.EXPERT -> "🔬 Experten-Modus: Tiefgehende System- & Algorithmen-Steuerung"
                             },
-                            modifier = Modifier
-                                .padding(start = 4.dp)
-                                .size(36.dp)
-                                .testTag("settings_tab_scroll_left")
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Vorherige Einstellungen-Tabs anzeigen",
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    }
-                }
-
-                // Dynamischer Pfeil RECHTS (sichtbar wenn noch Tabs nach rechts verborgen sind)
-                androidx.compose.animation.AnimatedVisibility(
-                    visible = tabScrollState.canScrollForward,
-                    enter = fadeIn() + slideInHorizontally { it },
-                    exit = fadeOut() + slideOutHorizontally { it },
-                    modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .fillMaxHeight()
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxHeight()
-                            .width(52.dp)
-                            .background(
-                                Brush.horizontalGradient(
-                                    colors = listOf(
-                                        Color.Transparent,
-                                        MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
-                                        MaterialTheme.colorScheme.surface
-                                    )
-                                )
-                            ),
-                        contentAlignment = Alignment.CenterEnd
-                    ) {
-                        FilledTonalIconButton(
-                            onClick = {
-                                scope.launch {
-                                    val target = (tabScrollState.value + 240).coerceAtMost(tabScrollState.maxValue)
-                                    tabScrollState.animateScrollTo(target)
-                                }
-                            },
-                            modifier = Modifier
-                                .padding(end = 4.dp)
-                                .size(36.dp)
-                                .testTag("settings_tab_scroll_right")
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                                contentDescription = "Weitere Einstellungen-Tabs anzeigen",
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 11.sp
+                        )
                     }
                 }
             }
         }
-    }
 
         when (selectedSettingsTab) {
             0 -> ScannerSettingsTab(viewModel)

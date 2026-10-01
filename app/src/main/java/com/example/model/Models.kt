@@ -457,7 +457,7 @@ data class PendingRuleSuggestion(
     val bitmap: android.graphics.Bitmap,
     val ocrText: String,
     val suggestedRule: DocRule,
-    val onSingleUseOnly: () -> Unit,
+    val onSingleUseOnly: (DocRule) -> Unit,
     val onSaveAsPermanentRule: (DocRule) -> Unit,
     val onDismiss: () -> Unit
 )

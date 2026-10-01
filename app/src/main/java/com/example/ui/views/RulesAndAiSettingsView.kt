@@ -1214,10 +1214,12 @@ fun AuditLogContent(viewModel: DocAnizerViewModel) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val auditLogs by viewModel.auditLogs.collectAsStateWithLifecycle()
     val availableModels by viewModel.availableModels.collectAsStateWithLifecycle()
+    val modelBenchmarks by viewModel.modelBenchmarks.collectAsStateWithLifecycle()
     val activeModel = availableModels.find { it.isSelected } ?: availableModels.firstOrNull()
 
     var selectedCategoryFilter by remember { mutableStateOf<com.example.service.LogCategory?>(null) }
     var searchQuery by remember { mutableStateOf("") }
+    var showBenchmarkOverview by remember { mutableStateOf(false) }
 
     val filteredLogs = remember(auditLogs, selectedCategoryFilter, searchQuery) {
         auditLogs.filter { entry ->
@@ -1225,7 +1227,8 @@ fun AuditLogContent(viewModel: DocAnizerViewModel) {
             val matchesSearch = searchQuery.isBlank() ||
                 entry.message.contains(searchQuery, ignoreCase = true) ||
                 entry.details.contains(searchQuery, ignoreCase = true) ||
-                entry.tag.contains(searchQuery, ignoreCase = true)
+                entry.tag.contains(searchQuery, ignoreCase = true) ||
+                (entry.reasoningTrace?.contains(searchQuery, ignoreCase = true) == true)
             matchesCategory && matchesSearch
         }
     }
@@ -1267,7 +1270,7 @@ fun AuditLogContent(viewModel: DocAnizerViewModel) {
                             }
                         }
                         Column {
-                            Text("100% Lokales Audit- & Diagnose-Log", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                            Text("100% Lokales Audit- & KI-Diagnose-Log", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                             Text("DSGVO-konform: Keine Cloud-Übertragung, 0 Byte Abfluss", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
@@ -1286,6 +1289,55 @@ fun AuditLogContent(viewModel: DocAnizerViewModel) {
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text("Protokoll-Einträge:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Text("${auditLogs.size} Ereignisse im Speicher", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
+                        }
+                        if (modelBenchmarks.isNotEmpty()) {
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                Text("Modell-Benchmarks:", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                TextButton(
+                                    onClick = { showBenchmarkOverview = !showBenchmarkOverview },
+                                    contentPadding = PaddingValues(0.dp),
+                                    modifier = Modifier.height(24.dp)
+                                ) {
+                                    Text(
+                                        text = if (showBenchmarkOverview) "Statistik verbergen" else "${modelBenchmarks.size} Modelle verglichen ▼",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Ausklappbare Modell-Benchmark-Statistik
+                AnimatedVisibility(visible = showBenchmarkOverview && modelBenchmarks.isNotEmpty()) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("Hardware- & Genauigkeits-Vergleich:", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                            modelBenchmarks.values.forEach { bench ->
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = MaterialTheme.colorScheme.surface,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                            Text(bench.modelName.take(28), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                                            Text("${bench.totalInferences} Durchläufe", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                                        }
+                                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                            Text("Ø Latenz: ${bench.avgLatencyMs}ms", style = MaterialTheme.typography.bodySmall, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            Text("Peak RAM: ${"%.1f".format(bench.peakRamDeltaMb)} MB", style = MaterialTheme.typography.bodySmall, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            Text("Ø Felder: ${"%.1f".format(bench.avgFieldsExtracted)}", style = MaterialTheme.typography.bodySmall, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -1344,7 +1396,7 @@ fun AuditLogContent(viewModel: DocAnizerViewModel) {
         OutlinedTextField(
             value = searchQuery,
             onValueChange = { searchQuery = it },
-            placeholder = { Text("Im Log filtern (z.B. Modell, OCR, Stadtwerke)...") },
+            placeholder = { Text("Im Log filtern (z.B. Modell, OCR, Think)...") },
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp)) },
             trailingIcon = {
                 if (searchQuery.isNotEmpty()) {
@@ -1437,6 +1489,43 @@ fun AuditLogItemCard(entry: com.example.service.AuditLogEntry) {
                 color = if (entry.isError) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
             )
 
+            // Hardware Telemetrie Badges (wenn vorhanden)
+            if (entry.ramDeltaMb != null || entry.latencyMs != null) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.padding(top = 2.dp)
+                ) {
+                    if (entry.latencyMs != null) {
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = MaterialTheme.colorScheme.surface
+                        ) {
+                            Text(
+                                text = "⚡ ${entry.latencyMs}ms",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontSize = 10.sp,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                    if (entry.ramDeltaMb != null && entry.ramDeltaMb > 0f) {
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = MaterialTheme.colorScheme.surface
+                        ) {
+                            Text(
+                                text = "🧠 RAM-Δ: ${entry.ramDeltaMb}MB",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontSize = 10.sp,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
+                                color = MaterialTheme.colorScheme.secondary
+                            )
+                        }
+                    }
+                }
+            }
+
             if (entry.details.isNotBlank()) {
                 if (expanded) {
                     Surface(
@@ -1458,6 +1547,31 @@ fun AuditLogItemCard(entry: com.example.service.AuditLogEntry) {
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+            }
+
+            // Detaillierter Reasoning-Trace (Gedankengang) wenn vorhanden & ausgeklappt
+            if (expanded && !entry.reasoningTrace.isNullOrBlank()) {
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = Color(0xFF1E293B).copy(alpha = 0.95f),
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
+                ) {
+                    Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Psychology, contentDescription = null, tint = Color(0xFF38BDF8), modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("KI-Gedankengang & Reasoning-Trace (<think>):", style = MaterialTheme.typography.labelSmall, color = Color(0xFF38BDF8), fontWeight = FontWeight.Bold)
+                        }
+                        Text(
+                            text = entry.reasoningTrace,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            fontSize = 11.sp,
+                            lineHeight = 15.sp,
+                            color = Color(0xFFE2E8F0)
+                        )
+                    }
                 }
             }
         }

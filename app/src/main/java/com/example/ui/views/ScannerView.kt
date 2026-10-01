@@ -178,6 +178,10 @@ fun ScannerView(
 
     val isAutoMode = scannerSettings.scanMode == "AUTO"
 
+    // Vorab-Qualitätsprüfung & Ecken-Justierung
+    var isQualityCheckModeActive by remember { mutableStateOf(false) }
+    var pendingCheckBitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+
     // Funktion zum Ausführen des eigentlichen Bildabzugs
     val executeCapture: () -> Unit = {
         hasCapturedCurrentDocument = true
@@ -194,17 +198,22 @@ fun ScannerView(
             com.example.service.ScanFeedbackService.playCaptureSound(scannerSettings.soundProfile)
             com.example.service.ScanFeedbackService.triggerVibration(context, scannerSettings.enableVibration)
 
-            if (isBatchModeActive) {
-                // Neuer Stapel-Puffer Modus: Sofort in die Inbox (entkoppelt für schnellen Stativscan)
-                viewModel.enqueueBatchDocument(bmp)
-            } else if (scannerSettings.isBulkMode || isAutoMode) {
-                // Einzel-/Bulk-Modus: Direktes Speichern mit intelligenter Regelprüfung & KI-Vorschlag
-                viewModel.saveSinglePageBulk(bmp) { savedDoc ->
-                    // Bleibt im Scanner, zeigt Bestätigung
-                }
+            if (isQualityCheckModeActive) {
+                // Vorab-Qualitätsprüfung anzeigen
+                pendingCheckBitmap = bmp
             } else {
-                // Manueller Mehrseiten-Modus: Seite der Liste hinzufügen
-                viewModel.addPage(bmp)
+                if (isBatchModeActive) {
+                    // Neuer Stapel-Puffer Modus: Sofort in die Inbox (entkoppelt für schnellen Stativscan)
+                    viewModel.enqueueBatchDocument(bmp)
+                } else if (scannerSettings.isBulkMode || isAutoMode) {
+                    // Einzel-/Bulk-Modus: Direktes Speichern mit intelligenter Regelprüfung & KI-Vorschlag
+                    viewModel.saveSinglePageBulk(bmp) { savedDoc ->
+                        // Bleibt im Scanner, zeigt Bestätigung
+                    }
+                } else {
+                    // Manueller Mehrseiten-Modus: Seite der Liste hinzufügen
+                    viewModel.addPage(bmp)
+                }
             }
         }
 
@@ -698,22 +707,46 @@ fun ScannerView(
                 )
             }
 
-            FilledTonalIconButton(
-                onClick = { galleryLauncher.launch("image/*") },
-                colors = IconButtonDefaults.filledTonalIconButtonColors(
-                    containerColor = Color(0xFF0F172A).copy(alpha = 0.7f),
-                    contentColor = Color.White
-                ),
-                modifier = Modifier
-                    .size(38.dp)
-                    .testTag("btn_import_gallery_quick")
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Default.PhotoLibrary,
-                    contentDescription = "Dokument aus Galerie importieren",
-                    tint = Color.White.copy(alpha = 0.9f),
-                    modifier = Modifier.size(18.dp)
-                )
+                // Qualitäts-Prüfung Vorab-Toggle
+                FilledTonalIconButton(
+                    onClick = { isQualityCheckModeActive = !isQualityCheckModeActive },
+                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = if (isQualityCheckModeActive) MaterialTheme.colorScheme.primary else Color(0xFF0F172A).copy(alpha = 0.7f),
+                        contentColor = Color.White
+                    ),
+                    modifier = Modifier
+                        .size(38.dp)
+                        .testTag("btn_toggle_quality_check")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Tune,
+                        contentDescription = "Aufnahme-Qualitäts-Check vor dem Speichern",
+                        tint = if (isQualityCheckModeActive) Color.White else Color.White.copy(alpha = 0.9f),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+
+                FilledTonalIconButton(
+                    onClick = { galleryLauncher.launch("image/*") },
+                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = Color(0xFF0F172A).copy(alpha = 0.7f),
+                        contentColor = Color.White
+                    ),
+                    modifier = Modifier
+                        .size(38.dp)
+                        .testTag("btn_import_gallery_quick")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PhotoLibrary,
+                        contentDescription = "Dokument aus Galerie importieren",
+                        tint = Color.White.copy(alpha = 0.9f),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
             }
         }
 
@@ -1186,10 +1219,33 @@ fun ScannerView(
         )
     }
 
+    pendingCheckBitmap?.let { checkBmp ->
+        com.example.ui.components.ScanQualityCheckDialog(
+            rawBitmap = checkBmp,
+            isColorMode = if (isAutoMode) viewModel.pdfSettings.value.defaultColorMode == "COLOR" else isColorMode,
+            onAcceptProcessed = { finalBmp ->
+                pendingCheckBitmap = null
+                if (isBatchModeActive) {
+                    viewModel.enqueueBatchDocument(finalBmp)
+                } else if (scannerSettings.isBulkMode || isAutoMode) {
+                    viewModel.saveSinglePageBulk(finalBmp) { savedDoc -> }
+                } else {
+                    viewModel.addPage(finalBmp)
+                }
+            },
+            onRetake = {
+                pendingCheckBitmap = null
+                hasCapturedCurrentDocument = false
+                autoDetectProgress = 0f
+            }
+        )
+    }
+
     pendingRuleSuggestion?.let { suggestion ->
         PendingRuleSuggestionDialog(
             suggestion = suggestion,
-            availableDocTypes = docTypes
+            availableDocTypes = docTypes,
+            viewModel = viewModel
         )
     }
 }

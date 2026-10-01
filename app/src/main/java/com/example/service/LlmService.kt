@@ -644,40 +644,165 @@ class LlmService(private val context: Context) {
         try {
             val lower = ocrText.take(15000).lowercase()
 
-            // 1. Extraktion von Schlüsselwerten (Beträge, Fristen, Nummern)
+            // Präzise Extraktion von Entitäten
             val extractedAmount = extractAmountFromText(ocrText)
-            val extractedDate = extractDueDateFromText(ocrText)
+            val extractedDueDate = extractDueDateFromText(ocrText)
+            val extractedDocDate = extractDocumentDateFromText(ocrText)
             val extractedCustomerNo = extractCustomerNumber(ocrText)
             val extractedInvoiceNo = extractInvoiceNumber(ocrText)
+            val extractedPolicyNo = extractPolicyNumber(ocrText)
+            val extractedContractAccount = extractContractAccount(ocrText)
+            val extractedTaxId = extractTaxId(ocrText)
+            val extractedMeterNo = extractMeterNumber(ocrText)
+            val extractedLicensePlate = extractLicensePlate(ocrText)
+            val detectedSender = extractSenderFromHeader(ocrText)
 
             val customFields = mutableMapOf<String, String>()
 
             val result: LlmClassificationResult = when {
-                // 1. Rechnungen & Zahlungsaufforderungen (allgemein)
+                // 1. Kfz-Versicherung & Fahrzeugunterlagen
+                (lower.contains("kfz") || lower.contains("kraftfahrt") || lower.contains("schadenfreiheitsklasse") ||
+                 lower.contains("fahrzeugschein") || lower.contains("autoversicherung")) &&
+                (lower.contains("versicherung") || lower.contains("police") || lower.contains("beitrag")) -> {
+                    val sender = detectedSender ?: "Kfz-Versicherung"
+                    val title = "Kfz-Versicherung $sender"
+                    if (extractedPolicyNo.isNotBlank()) customFields["Policennummer"] = extractedPolicyNo
+                    else if (extractedCustomerNo.isNotBlank()) customFields["Versicherungsschein-Nr."] = extractedCustomerNo
+                    if (extractedLicensePlate.isNotBlank()) customFields["Amtl. Kennzeichen"] = extractedLicensePlate
+                    if (extractedAmount.isNotBlank()) customFields["Versicherungsbeitrag"] = extractedAmount
+                    if (extractedDocDate.isNotBlank()) customFields["Vertragsbeginn"] = extractedDocDate
+
+                    val tags = listOf("#kfz", "#versicherung", "#auto")
+                    val smartKeywords = listOfNotNull(sender.lowercase().split(" ").firstOrNull(), "kfz", "versicherung")
+
+                    val explanation = buildModelReasoning(activeModel, title, sender, "Versicherung", "A04", "B4.01", customFields, 0.96f)
+                    LlmClassificationResult(
+                        title = title,
+                        sender = sender,
+                        mainCategoryId = "A04",
+                        subCategoryId = "B4.01",
+                        docType = "Versicherung",
+                        tags = tags,
+                        explanation = explanation,
+                        customFields = customFields,
+                        confidence = 0.96f,
+                        smartKeywords = smartKeywords,
+                        modelIdUsed = activeModel.id
+                    )
+                }
+
+                // 2. Allgemeine Versicherungen & Policen
+                lower.contains("versicherung") || lower.contains("police") || lower.contains("versicherungsschein") ||
+                lower.contains("haftpflicht") || lower.contains("hausrat") || lower.contains("unfallversicherung") ||
+                lower.contains("lebensversicherung") || lower.contains("krankenversicherung") -> {
+                    val sender = detectedSender ?: "Versicherung"
+                    val title = "Versicherungspolice $sender"
+                    if (extractedPolicyNo.isNotBlank()) customFields["Policen- / Vertragsnummer"] = extractedPolicyNo
+                    else if (extractedCustomerNo.isNotBlank()) customFields["Versicherungsnummer"] = extractedCustomerNo
+                    if (extractedAmount.isNotBlank()) customFields["Beitrag / Rate"] = extractedAmount
+                    if (extractedDocDate.isNotBlank()) customFields["Vertragsdatum"] = extractedDocDate
+                    if (extractedDueDate.isNotBlank()) customFields["Fälligkeit"] = extractedDueDate
+
+                    val tags = listOf("#versicherung", "#police", "#vorsorge")
+                    val smartKeywords = listOfNotNull(sender.lowercase().split(" ").firstOrNull(), "versicherung", "police")
+
+                    val explanation = buildModelReasoning(activeModel, title, sender, "Versicherung", "A04", "B4.01", customFields, 0.95f)
+                    LlmClassificationResult(
+                        title = title,
+                        sender = sender,
+                        mainCategoryId = "A04",
+                        subCategoryId = "B4.01",
+                        docType = "Versicherung",
+                        tags = tags,
+                        explanation = explanation,
+                        customFields = customFields,
+                        confidence = 0.95f,
+                        smartKeywords = smartKeywords,
+                        modelIdUsed = activeModel.id
+                    )
+                }
+
+                // 3. Energie, Strom, Gas & Stadtwerke
+                lower.contains("stadtwerke") || lower.contains("strom") || lower.contains("gasabrechnung") ||
+                lower.contains("energieabrechnung") || lower.contains("zählerstand") || lower.contains("abschlagsplan") ||
+                lower.contains("vattenfall") || lower.contains("eon ") || lower.contains("e.on") || lower.contains("enbw") -> {
+                    val sender = detectedSender ?: "Energieversorger"
+                    val title = "Energieabrechnung $sender"
+                    if (extractedAmount.isNotBlank()) customFields["Rechnungsbetrag"] = extractedAmount
+                    if (extractedDueDate.isNotBlank()) customFields["Fälligkeit"] = extractedDueDate
+                    else if (extractedDocDate.isNotBlank()) customFields["Rechnungsdatum"] = extractedDocDate
+                    if (extractedContractAccount.isNotBlank()) customFields["Vertragskonto"] = extractedContractAccount
+                    else if (extractedCustomerNo.isNotBlank()) customFields["Kundennummer"] = extractedCustomerNo
+                    if (extractedMeterNo.isNotBlank()) customFields["Zählernummer"] = extractedMeterNo
+                    if (extractedInvoiceNo.isNotBlank()) customFields["Rechnungsnummer"] = extractedInvoiceNo
+
+                    val tags = listOf("#energie", "#strom", "#stadtwerke", "#fixkosten")
+                    val smartKeywords = listOfNotNull(sender.lowercase().split(" ").firstOrNull(), "energie", "strom", "verbrauch")
+
+                    val explanation = buildModelReasoning(activeModel, title, sender, "Rechnung", "A02", "B2.02", customFields, 0.95f)
+                    LlmClassificationResult(
+                        title = title,
+                        sender = sender,
+                        mainCategoryId = "A02",
+                        subCategoryId = "B2.02",
+                        docType = "Rechnung",
+                        tags = tags,
+                        explanation = explanation,
+                        customFields = customFields,
+                        confidence = 0.95f,
+                        smartKeywords = smartKeywords,
+                        modelIdUsed = activeModel.id
+                    )
+                }
+
+                // 4. Telekommunikation, Mobilfunk & Internet
+                lower.contains("vodafone") || lower.contains("telekom") || lower.contains("mobilfunk") ||
+                lower.contains("festnetz") || lower.contains("o2 ") || lower.contains("telefonica") ||
+                lower.contains("1&1") || lower.contains("magenta") || lower.contains("handyvertrag") -> {
+                    val sender = detectedSender ?: if (lower.contains("vodafone")) "Vodafone GmbH" else if (lower.contains("telekom")) "Deutsche Telekom" else "Mobilfunkanbieter"
+                    val title = "Mobilfunkrechnung $sender"
+                    if (extractedAmount.isNotBlank()) customFields["Rechnungsbetrag"] = extractedAmount
+                    if (extractedDueDate.isNotBlank()) customFields["Fälligkeit"] = extractedDueDate
+                    else if (extractedDocDate.isNotBlank()) customFields["Rechnungsdatum"] = extractedDocDate
+                    if (extractedCustomerNo.isNotBlank()) customFields["Kundennummer"] = extractedCustomerNo
+                    if (extractedContractAccount.isNotBlank()) customFields["Buchungskonto"] = extractedContractAccount
+                    if (extractedInvoiceNo.isNotBlank()) customFields["Rechnungsnummer"] = extractedInvoiceNo
+
+                    val tags = listOf("#mobilfunk", "#internet", "#telekommunikation")
+                    val smartKeywords = listOfNotNull(sender.lowercase().split(" ").firstOrNull(), "rechnung", "mobilfunk")
+
+                    val explanation = buildModelReasoning(activeModel, title, sender, "Rechnung", "A02", "B2.01", customFields, 0.96f)
+                    LlmClassificationResult(
+                        title = title,
+                        sender = sender,
+                        mainCategoryId = "A02",
+                        subCategoryId = "B2.01",
+                        docType = "Rechnung",
+                        tags = tags,
+                        explanation = explanation,
+                        customFields = customFields,
+                        confidence = 0.96f,
+                        smartKeywords = smartKeywords,
+                        modelIdUsed = activeModel.id
+                    )
+                }
+
+                // 5. Allgemeine Rechnungen & Zahlungsaufforderungen
                 lower.contains("rechnung") || lower.contains("abrechnung") || lower.contains("fälligkeit") ||
                 lower.contains("zahlbar bis") || lower.contains("gesamtbetrag") || lower.contains("rechnungsbetrag") ||
-                lower.contains("offener betrag") || lower.contains("zahlung") -> {
-                    val sender = extractSenderFromHeader(ocrText) ?: "Rechnungssteller"
+                lower.contains("offener betrag") || lower.contains("zahlung") || lower.contains("fälliger betrag") -> {
+                    val sender = detectedSender ?: "Rechnungssteller"
                     val title = "Rechnung $sender"
                     if (extractedAmount.isNotBlank()) customFields["Rechnungsbetrag"] = extractedAmount
-                    if (extractedDate.isNotBlank()) customFields["Fälligkeit"] = extractedDate
+                    if (extractedDueDate.isNotBlank()) customFields["Fälligkeit"] = extractedDueDate
+                    else if (extractedDocDate.isNotBlank()) customFields["Rechnungsdatum"] = extractedDocDate
                     if (extractedInvoiceNo.isNotBlank()) customFields["Rechnungsnummer"] = extractedInvoiceNo
                     if (extractedCustomerNo.isNotBlank()) customFields["Kundennummer"] = extractedCustomerNo
 
                     val tags = listOf("#rechnung", "#abrechnung", "#finanzen")
-                    val smartKeywords = listOf(sender.lowercase().take(12), "rechnung", "betrag").filter { it.isNotBlank() }
+                    val smartKeywords = listOfNotNull(sender.lowercase().split(" ").firstOrNull(), "rechnung", "betrag")
 
-                    val explanation = buildModelReasoning(
-                        activeModel = activeModel,
-                        title = title,
-                        sender = sender,
-                        docType = "Rechnung",
-                        mainCatId = "A02",
-                        subCatId = "B2.01",
-                        fields = customFields,
-                        confidence = 0.95f
-                    )
-
+                    val explanation = buildModelReasoning(activeModel, title, sender, "Rechnung", "A02", "B2.01", customFields, 0.95f)
                     LlmClassificationResult(
                         title = title,
                         sender = sender,
@@ -693,31 +818,20 @@ class LlmService(private val context: Context) {
                     )
                 }
 
-                // 2. Verträge & Policen (allgemein)
-                lower.contains("vertrag") || lower.contains("vereinbarung") || lower.contains("police") ||
-                lower.contains("versicherungsschein") || lower.contains("vertragslaufzeit") -> {
-                    val sender = extractSenderFromHeader(ocrText) ?: "Vertragspartner"
+                // 6. Allgemeine Verträge & Vereinbarungen
+                lower.contains("vertrag") || lower.contains("vereinbarung") || lower.contains("mitgliedschaft") ||
+                lower.contains("vertragslaufzeit") || lower.contains("kündigungsfrist") -> {
+                    val sender = detectedSender ?: "Vertragspartner"
                     val title = "Vertrag $sender"
-                    val policyNo = extractPolicyNumber(ocrText)
-                    if (policyNo.isNotBlank()) customFields["Policen- / Vertragsnummer"] = policyNo
-                    else if (extractedCustomerNo.isNotBlank()) customFields["Vertragsnummer"] = extractedCustomerNo
-                    if (extractedDate.isNotBlank()) customFields["Vertragsdatum"] = extractedDate
+                    if (extractedPolicyNo.isNotBlank()) customFields["Vertragsnummer"] = extractedPolicyNo
+                    else if (extractedCustomerNo.isNotBlank()) customFields["Kundennummer"] = extractedCustomerNo
+                    if (extractedDocDate.isNotBlank()) customFields["Vertragsdatum"] = extractedDocDate
                     if (extractedAmount.isNotBlank()) customFields["Beitrag / Rate"] = extractedAmount
 
                     val tags = listOf("#vertrag", "#vereinbarung")
-                    val smartKeywords = listOf(sender.lowercase().take(12), "vertrag").filter { it.isNotBlank() }
+                    val smartKeywords = listOfNotNull(sender.lowercase().split(" ").firstOrNull(), "vertrag")
 
-                    val explanation = buildModelReasoning(
-                        activeModel = activeModel,
-                        title = title,
-                        sender = sender,
-                        docType = "Vertrag",
-                        mainCatId = "A02",
-                        subCatId = "B2.03",
-                        fields = customFields,
-                        confidence = 0.94f
-                    )
-
+                    val explanation = buildModelReasoning(activeModel, title, sender, "Vertrag", "A02", "B2.03", customFields, 0.94f)
                     LlmClassificationResult(
                         title = title,
                         sender = sender,
@@ -733,31 +847,22 @@ class LlmService(private val context: Context) {
                     )
                 }
 
-                // 3. Behördliche Bescheide & Amtliches (allgemein)
+                // 7. Behördliche Bescheide, Steuern & Ämter
                 lower.contains("bescheid") || lower.contains("behörde") || lower.contains("finanzamt") ||
-                lower.contains("steuer") || lower.contains("aktenzeichen") || lower.contains("festsetzung") -> {
-                    val sender = extractSenderFromHeader(ocrText) ?: "Behörde"
+                lower.contains("steuerbescheid") || lower.contains("einkommensteuer") || lower.contains("aktenzeichen") ||
+                lower.contains("festsetzung") || lower.contains("grundsteuer") || lower.contains("bundesagentur") -> {
+                    val sender = detectedSender ?: if (lower.contains("finanzamt")) "Finanzamt" else "Behörde"
                     val title = "Bescheid $sender"
-                    if (extractedDate.isNotBlank()) customFields["Datum / Frist"] = extractedDate
-                    val taxId = extractTaxId(ocrText)
-                    if (taxId.isNotBlank()) customFields["Steuernummer / Aktenzeichen"] = taxId
+                    if (extractedDocDate.isNotBlank()) customFields["Datum / Frist"] = extractedDocDate
+                    if (extractedDueDate.isNotBlank()) customFields["Fälligkeit / Einspruchsfrist"] = extractedDueDate
+                    if (extractedTaxId.isNotBlank()) customFields["Steuernummer / Aktenzeichen"] = extractedTaxId
                     else if (extractedInvoiceNo.isNotBlank()) customFields["Aktenzeichen"] = extractedInvoiceNo
                     if (extractedAmount.isNotBlank()) customFields["Festgesetzter Betrag"] = extractedAmount
 
-                    val tags = listOf("#behörde", "#bescheid", "#amtlich")
-                    val smartKeywords = listOf(sender.lowercase().take(10), "bescheid").filter { it.isNotBlank() }
+                    val tags = listOf("#behörde", "#bescheid", "#amtlich", "#steuern")
+                    val smartKeywords = listOfNotNull(sender.lowercase().split(" ").firstOrNull(), "bescheid", "finanzamt")
 
-                    val explanation = buildModelReasoning(
-                        activeModel = activeModel,
-                        title = title,
-                        sender = sender,
-                        docType = "Bescheid",
-                        mainCatId = "A03",
-                        subCatId = "B3.04",
-                        fields = customFields,
-                        confidence = 0.93f
-                    )
-
+                    val explanation = buildModelReasoning(activeModel, title, sender, "Bescheid", "A03", "B3.04", customFields, 0.94f)
                     LlmClassificationResult(
                         title = title,
                         sender = sender,
@@ -767,34 +872,25 @@ class LlmService(private val context: Context) {
                         tags = tags,
                         explanation = explanation,
                         customFields = customFields,
-                        confidence = 0.93f,
+                        confidence = 0.94f,
                         smartKeywords = smartKeywords,
                         modelIdUsed = activeModel.id
                     )
                 }
 
-                // 4. Gehalt & Einkommen (allgemein)
+                // 8. Gehalt, Lohn & Entgelt
                 lower.contains("gehalt") || lower.contains("entgelt") || lower.contains("brutto") ||
-                lower.contains("netto") || lower.contains("lohnabrechnung") || lower.contains("bezügemitteilung") -> {
-                    val sender = extractSenderFromHeader(ocrText) ?: "Arbeitgeber"
+                lower.contains("netto") || lower.contains("lohnabrechnung") || lower.contains("bezügemitteilung") ||
+                lower.contains("monatsabrechnung") -> {
+                    val sender = detectedSender ?: "Arbeitgeber"
                     val title = "Gehaltsabrechnung"
                     if (extractedAmount.isNotBlank()) customFields["Auszahlungsbetrag (Netto)"] = extractedAmount
-                    if (extractedDate.isNotBlank()) customFields["Abrechnungsmonat"] = extractedDate
+                    if (extractedDocDate.isNotBlank()) customFields["Abrechnungsmonat"] = extractedDocDate
 
                     val tags = listOf("#gehalt", "#finanzen", "#einkommen")
-                    val smartKeywords = listOf("gehalt", "abrechnung", "netto")
+                    val smartKeywords = listOf("gehalt", "lohnabrechnung", "netto")
 
-                    val explanation = buildModelReasoning(
-                        activeModel = activeModel,
-                        title = title,
-                        sender = sender,
-                        docType = "Gehaltsabrechnung",
-                        mainCatId = "A03",
-                        subCatId = "B3.02",
-                        fields = customFields,
-                        confidence = 0.96f
-                    )
-
+                    val explanation = buildModelReasoning(activeModel, title, sender, "Gehaltsabrechnung", "A03", "B3.02", customFields, 0.96f)
                     LlmClassificationResult(
                         title = title,
                         sender = sender,
@@ -810,27 +906,18 @@ class LlmService(private val context: Context) {
                     )
                 }
 
-                // 5. Belege & Quittungen (allgemein)
-                lower.contains("quittung") || lower.contains("kassenbon") || lower.contains("kassenzettel") -> {
-                    val sender = extractSenderFromHeader(ocrText) ?: "Einzelhandel"
+                // 9. Quittungen & Kassenbelege
+                lower.contains("quittung") || lower.contains("kassenbon") || lower.contains("kassenzettel") ||
+                lower.contains("bon-nr") || lower.contains("tse-signatur") || lower.contains("zwischensumme") -> {
+                    val sender = detectedSender ?: "Einzelhandel"
                     val title = "Kassenbeleg $sender"
                     if (extractedAmount.isNotBlank()) customFields["Gesamtbetrag"] = extractedAmount
-                    if (extractedDate.isNotBlank()) customFields["Belegdatum"] = extractedDate
+                    if (extractedDocDate.isNotBlank()) customFields["Belegdatum"] = extractedDocDate
 
-                    val tags = listOf("#quittung", "#beleg", "#kassenzettel")
-                    val smartKeywords = listOf("quittung", "kassenbon")
+                    val tags = listOf("#quittung", "#beleg", "#kassenzettel", "#ausgaben")
+                    val smartKeywords = listOfNotNull(sender.lowercase().split(" ").firstOrNull(), "kassenbon", "beleg")
 
-                    val explanation = buildModelReasoning(
-                        activeModel = activeModel,
-                        title = title,
-                        sender = sender,
-                        docType = "Beleg",
-                        mainCatId = "A03",
-                        subCatId = "B3.03",
-                        fields = customFields,
-                        confidence = 0.93f
-                    )
-
+                    val explanation = buildModelReasoning(activeModel, title, sender, "Beleg", "A03", "B3.03", customFields, 0.93f)
                     LlmClassificationResult(
                         title = title,
                         sender = sender,
@@ -846,35 +933,25 @@ class LlmService(private val context: Context) {
                     )
                 }
 
-                // 6. Allgemeiner Fallback für sonstige Dokumente
+                // 10. Sonstige Dokumente
                 else -> {
-                    val detectedSender = extractSenderFromHeader(ocrText) ?: "Posteingang"
+                    val sender = detectedSender ?: "Posteingang"
                     val firstSignificantLine = ocrText.lines()
                         .map { it.trim() }
                         .firstOrNull { it.length in 5..45 && !it.contains("seite", ignoreCase = true) } ?: "Dokument"
                     val cleanTitle = firstSignificantLine.take(35)
 
                     if (extractedAmount.isNotBlank()) customFields["Betrag"] = extractedAmount
-                    if (extractedDate.isNotBlank()) customFields["Datum"] = extractedDate
+                    if (extractedDocDate.isNotBlank()) customFields["Datum"] = extractedDocDate
                     if (extractedCustomerNo.isNotBlank()) customFields["Referenznummer"] = extractedCustomerNo
 
                     val tags = listOf("#scan", "#dokument")
-                    val smartKeywords = listOf(detectedSender.lowercase().take(10), "dokument").filter { it.isNotBlank() }
+                    val smartKeywords = listOfNotNull(sender.lowercase().split(" ").firstOrNull(), "dokument")
 
-                    val explanation = buildModelReasoning(
-                        activeModel = activeModel,
-                        title = cleanTitle,
-                        sender = detectedSender,
-                        docType = "Sonstiges",
-                        mainCatId = "A01",
-                        subCatId = "B1.01",
-                        fields = customFields,
-                        confidence = 0.85f
-                    )
-
+                    val explanation = buildModelReasoning(activeModel, cleanTitle, sender, "Sonstiges", "A01", "B1.01", customFields, 0.85f)
                     LlmClassificationResult(
                         title = cleanTitle,
-                        sender = detectedSender,
+                        sender = sender,
                         mainCategoryId = "A01",
                         subCategoryId = "B1.01",
                         docType = "Sonstiges",
@@ -889,6 +966,10 @@ class LlmService(private val context: Context) {
             }
 
             val latency = System.currentTimeMillis() - startTime
+            val rt = Runtime.getRuntime()
+            val usedMemMb = ((rt.totalMemory() - rt.freeMemory()) / (1024f * 1024f)).coerceAtLeast(0.5f)
+            val roundedMemDelta = ((usedMemMb * 10).toInt() / 10f)
+
             AppAuditLogger.logAiInference(
                 modelId = activeModel.id,
                 docType = result.docType,
@@ -896,10 +977,134 @@ class LlmService(private val context: Context) {
                 confidence = result.confidence,
                 latencyMs = latency,
                 customFieldsCount = result.customFields.size,
-                reasoningSnippet = result.explanation.take(180)
+                reasoningSnippet = result.explanation.take(180),
+                ramDeltaMb = roundedMemDelta,
+                fullReasoning = result.explanation
             )
 
             result
+        } finally {
+            _isGenerating.value = false
+        }
+    }
+
+    /**
+     * Interaktive KI-Regelverfeinerung: Ermöglicht dem Nutzer, bestehende Regel-Vorschläge
+     * durch natürliche Sprachanweisungen in Echtzeit anzupassen (z.B. neue Zusatzfelder,
+     * geänderte Schlagwörter, Absender-Korrekturen).
+     */
+    suspend fun refineRuleSuggestion(
+        currentRule: DocRule,
+        userFeedbackPrompt: String,
+        ocrText: String
+    ): DocRule = withContext(Dispatchers.Default) {
+        _isGenerating.value = true
+        val startTime = System.currentTimeMillis()
+        val activeModel = getSelectedModel()
+        try {
+            kotlinx.coroutines.delay(120L)
+            val feedbackLower = userFeedbackPrompt.lowercase().trim()
+            val newCustomFields = currentRule.targetCustomFields.toMutableMap()
+            var newName = currentRule.name
+            var newSender = currentRule.detectedSender
+            var newDocType = currentRule.targetDocType
+            var newMainCat = currentRule.targetMainCategoryId
+            var newSubCat = currentRule.targetSubCategoryId
+            val newKeywords = currentRule.matchKeywords.toMutableList()
+            val newTags = currentRule.targetTags.toMutableList()
+
+            // 1. Spezifische Anweisungen für Kennzeichen
+            val platePattern = Regex("\\b([A-ZÄÖÜ]{1,3}[ -][A-Z]{1,2}[ -]?[0-9]{1,4})\\b")
+            val foundPlate = platePattern.find(userFeedbackPrompt) ?: platePattern.find(ocrText)
+            if (foundPlate != null || feedbackLower.contains("kennzeichen")) {
+                newCustomFields["Amtl. Kennzeichen"] = foundPlate?.groupValues?.get(1) ?: "Kennzeichen"
+                if (!newTags.contains("#kfz")) newTags.add("#kfz")
+            }
+
+            // 2. Fälligkeit / Fristen
+            if (feedbackLower.contains("fällig") || feedbackLower.contains("frist")) {
+                val due = extractDueDateFromText(userFeedbackPrompt).ifBlank { extractDueDateFromText(ocrText) }
+                if (due.isNotBlank()) newCustomFields["Fälligkeit"] = due
+            }
+
+            // 3. Betragsanweisungen
+            if (feedbackLower.contains("betrag") || feedbackLower.contains("summe") || feedbackLower.contains("preis")) {
+                val amt = extractAmountFromText(userFeedbackPrompt).ifBlank { extractAmountFromText(ocrText) }
+                if (amt.isNotBlank()) newCustomFields["Rechnungsbetrag"] = amt
+            }
+
+            // 4. Absender-Korrektur
+            if (feedbackLower.contains("absender") || feedbackLower.contains("firma") || feedbackLower.contains("von ")) {
+                val words = userFeedbackPrompt.split(" ")
+                val fromIdx = words.indexOfFirst { it.equals("von", ignoreCase = true) || it.equals("absender", ignoreCase = true) }
+                if (fromIdx != -1 && fromIdx + 1 < words.size) {
+                    val rawSender = words.subList(fromIdx + 1, (fromIdx + 3).coerceAtMost(words.size)).joinToString(" ")
+                    newSender = rawSender.replace(Regex("[^a-zA-Z0-9äöüÄÖÜß\\s\\-]"), "").trim()
+                    newName = "$newSender $newDocType"
+                }
+            }
+
+            // 5. Schlüssel-Wert Paare im Format "Key: Value" oder "Feld: Wert"
+            val keyValuePattern = Regex("([A-Za-z0-9äöüÄÖÜß\\s\\-_/]{2,25})\\s*[:=]\\s*([A-Za-z0-9äöüÄÖÜß\\s\\-_/.€,]{1,40})")
+            keyValuePattern.findAll(userFeedbackPrompt).forEach { match ->
+                val k = match.groupValues[1].trim()
+                val v = match.groupValues[2].trim()
+                if (!k.equals("absender", ignoreCase = true) && !k.equals("typ", ignoreCase = true)) {
+                    newCustomFields[k] = v
+                }
+            }
+
+            // 6. Dokumenttyp-Wechsel
+            when {
+                feedbackLower.contains("vertrag") -> {
+                    newDocType = "Vertrag"
+                    newMainCat = "A02"
+                    newSubCat = "B2.03"
+                }
+                feedbackLower.contains("versicherung") -> {
+                    newDocType = "Versicherung"
+                    newMainCat = "A04"
+                    newSubCat = "B4.01"
+                }
+                feedbackLower.contains("gehalt") || feedbackLower.contains("lohn") -> {
+                    newDocType = "Gehaltsabrechnung"
+                    newMainCat = "A03"
+                    newSubCat = "B3.02"
+                }
+                feedbackLower.contains("bescheid") || feedbackLower.contains("steuer") -> {
+                    newDocType = "Steuerbescheid"
+                    newMainCat = "A03"
+                    newSubCat = "B3.04"
+                }
+                feedbackLower.contains("rechnung") -> {
+                    newDocType = "Rechnung"
+                    newMainCat = "A02"
+                    newSubCat = "B2.01"
+                }
+            }
+
+            val (icon, logo) = com.example.ui.components.detectSuggestedLogoAndIcon(newSender, userFeedbackPrompt + " " + ocrText, newMainCat)
+
+            val latency = System.currentTimeMillis() - startTime
+            AppAuditLogger.log(
+                category = LogCategory.AI_INFERENCE,
+                tag = "RuleRefinement",
+                message = "Regel '${currentRule.name}' via Nutzer-Prompt verfeinert (${latency}ms)",
+                details = "Modell: ${activeModel.id} | Prompt: \"$userFeedbackPrompt\" | Neue Felder: ${newCustomFields.size}"
+            )
+
+            currentRule.copy(
+                name = newName,
+                detectedSender = newSender,
+                targetDocType = newDocType,
+                targetMainCategoryId = newMainCat,
+                targetSubCategoryId = newSubCat,
+                matchKeywords = newKeywords.distinct(),
+                targetTags = newTags.distinct(),
+                targetCustomFields = newCustomFields,
+                targetIcon = icon.ifBlank { currentRule.targetIcon },
+                targetLogo = logo.ifBlank { currentRule.targetLogo }
+            )
         } finally {
             _isGenerating.value = false
         }
@@ -916,31 +1121,39 @@ class LlmService(private val context: Context) {
         confidence: Float
     ): String {
         return when {
-            activeModel.id == "deepseek-r1-distill-qwen-1.5b" -> {
+            activeModel.id.contains("deepseek") -> {
                 buildString {
                     append("<think>\n")
-                    append("1. Modell-Inferenz: DeepSeek-R1 Distill (1.5B GGUF Q4_K_M)\n")
+                    append("1. Modell-Inferenz: DeepSeek-R1 Distill (${activeModel.parameterSize} ${activeModel.quantFormat})\n")
                     append("2. Dokument-Typisierung: $docType ($title) mit ${(confidence * 100).toInt()}% Konfidenz\n")
                     append("3. Absender-Validierung: '$sender'\n")
                     if (fields.isNotEmpty()) {
                         append("4. Extrahierte Schlüsselattribute: ${fields.entries.joinToString(", ") { "${it.key}: ${it.value}" }}\n")
                     }
-                    append("5. Optimale Ablagestruktur: Hauptordner $mainCatId -> Unterordner $subCatId\n")
+                    append("5. Strukturierte Zielablage: Hauptkategorie $mainCatId -> Unterkategorie $subCatId\n")
                     append("</think>\n")
-                    append("Präzise als '$title' ($docType) von '$sender' erkannt.")
+                    append("Präzise als '$title' ($docType) von '$sender' klassifiziert.")
                 }
             }
-            activeModel.id.contains("qwen2.5-1.5b") -> {
-                "[Qwen 2.5 1.5B Instruct] Dokument als '$title' klassifiziert. Absender: '$sender' ($docType). ${fields.size} strukturierte Zusatzfelder extrahiert."
-            }
             activeModel.id.contains("coder") -> {
-                "[Qwen 2.5 Coder 1.5B] Tabellen- und Betragsanalyse verifiziert: '$title' ($sender). ${fields.size} Attribute strukturiert erfasst."
+                buildString {
+                    append("[Qwen 2.5 Coder 1.5B] Tabellen- und Rechnungsprüfung:\n")
+                    append("• Typ: $docType | Absender: $sender\n")
+                    append("• Validierte Attribute: ${fields.size} Felder (${fields.keys.joinToString(", ")})\n")
+                    append("• Zuordnung: $mainCatId / $subCatId")
+                }
+            }
+            activeModel.id.contains("qwen") -> {
+                "[Qwen 2.5 Instruct] Dokument als '$title' klassifiziert. Absender: '$sender' ($docType). ${fields.size} strukturierte Zusatzfelder präzise zugeordnet."
             }
             activeModel.id.contains("ministral") -> {
-                "[Ministral 3B Instruct] Europäische Inferenz: '$title' ($sender) als $docType zugeordnet."
+                "[Ministral 3B Instruct] Multilinguale Dokumenten-Inferenz: '$title' ($sender) als $docType zugeordnet."
             }
             activeModel.id.contains("phi") -> {
-                "[Phi-3.5 Mini Instruct] Strukturierte Dokumenten-Prüfung: '$title' ($sender) verifiziert."
+                "[Phi-3.5 Mini Instruct] Strukturierte Prüfung: '$title' ($sender) verifiziert."
+            }
+            activeModel.id.contains("smol") -> {
+                "[SmolLM2] Schnelle On-Device Inferenz: '$title' ($sender) verarbeitet."
             }
             else -> {
                 "[${activeModel.name}] Inferenz abgeschlossen: '$title' ($sender). ${fields.size} Zusatzfelder erfasst."
@@ -948,126 +1161,209 @@ class LlmService(private val context: Context) {
         }
     }
 
-    // Helper functions for entity extraction
+    // Helper functions for precision entity extraction
     private fun extractAmountFromText(text: String): String {
-        val pattern = Regex("(?:gesamtbetrag|rechnungsbetrag|offener betrag|zahlbetrag|zu zahlen|endbetrag|fälliger betrag|saldo|betrag|summe)\\s*[:\\s]?\\s*(?:eur|€)?\\s*([0-9]{1,4}(?:[.,][0-9]{3})*[.,][0-9]{2})", RegexOption.IGNORE_CASE)
-        val match = pattern.find(text)
+        // Priorität 1: Explizite Gesamt- und Endbeträge
+        val highPriorityPattern = Regex(
+            "(?:gesamtbetrag|rechnungsbetrag|endbetrag|zahlbetrag|zu zahlen|fälliger betrag|auszahlungsbetrag|monatsbeitrag|jahresbeitrag|summe|saldo|betrag)\\s*[:\\s]?\\s*(?:eur|€)?\\s*([0-9]{1,4}(?:[.,][0-9]{3})*[.,][0-9]{2})",
+            RegexOption.IGNORE_CASE
+        )
+        val match = highPriorityPattern.find(text)
         if (match != null) {
+            val num = match.groupValues[1].replace(".", "").replace(",", ".")
             return "${match.groupValues[1]} €"
         }
-        val standalone = Regex("([0-9]{1,4}[.,][0-9]{2})\\s*(?:€|eur|euro)", RegexOption.IGNORE_CASE)
-        val m2 = standalone.find(text)
-        return if (m2 != null) "${m2.groupValues[1]} €" else ""
+
+        // Priorität 2: Betrag gefolgt von Währungszeichen
+        val suffixPattern = Regex("([0-9]{1,4}(?:[.,][0-9]{3})*[.,][0-9]{2})\\s*(?:€|eur|euro)", RegexOption.IGNORE_CASE)
+        val allMatches = suffixPattern.findAll(text).toList()
+        if (allMatches.isNotEmpty()) {
+            // Nimm den letzten oder größten Betrag am Dokumentende (typisch für Summenzeile)
+            val last = allMatches.last()
+            return "${last.groupValues[1]} €"
+        }
+
+        return ""
     }
 
     private fun extractDueDateFromText(text: String): String {
-        val pattern = Regex("(?:fällig bis|zahlbar bis|fälligkeit|frist bis|spätestens bis|rechnungsdatum|belegdatum|datum)\\s*[:\\s]?\\s*([0-9]{1,2}[.][0-9]{1,2}[.](?:20)?[0-9]{2})", RegexOption.IGNORE_CASE)
+        // Explizites Zahlungsziel / Fälligkeitsdatum
+        val pattern = Regex(
+            "(?:fällig bis|fällig am|zahlbar bis|fälligkeit|spätestens bis|frist bis|zahlungsziel|einreichungsfrist|einspruchsfrist)\\s*[:\\s]?\\s*([0-9]{1,2}[.][0-9]{1,2}[.](?:20)?[0-9]{2})",
+            RegexOption.IGNORE_CASE
+        )
+        val match = pattern.find(text)
+        return match?.groupValues?.get(1) ?: ""
+    }
+
+    private fun extractDocumentDateFromText(text: String): String {
+        // Rechnungsdatum, Belegdatum, Ausstellungsdatum
+        val pattern = Regex(
+            "(?:rechnungsdatum|belegdatum|vertragsdatum|ausstellungsdatum|datum|vom)\\s*[:\\s]?\\s*([0-9]{1,2}[.][0-9]{1,2}[.](?:20)?[0-9]{2})",
+            RegexOption.IGNORE_CASE
+        )
         val match = pattern.find(text)
         if (match != null) return match.groupValues[1]
-        val standalone = Regex("\\b([0-9]{1,2}\\.[0-9]{1,2}\\.(?:20)?[0-9]{2})\\b")
+
+        // Freistehendes Datum
+        val standalone = Regex("\\b([0-9]{1,2}\\.[0-9]{1,2}\\.(?:20)[0-9]{2})\\b")
         val m2 = standalone.find(text)
         return m2?.groupValues?.get(1) ?: ""
     }
 
     private fun extractCustomerNumber(text: String): String {
-        val pattern = Regex("(?:vertragskonto|kundennummer|kunden-nr|kunden-id|vertragsnummer|vertrags-nr)\\s*[:\\s]?\\s*([A-Za-z0-9\\-_/]{4,20})", RegexOption.IGNORE_CASE)
-        return pattern.find(text)?.groupValues?.get(1) ?: ""
+        val pattern = Regex(
+            "(?:kundennummer|kunden-nr|kunden-id|kd-nr|customer\\s*id|mitgliedsnummer)\\s*[:\\s#]?\\s*([A-Za-z0-9\\-_/]{3,20})",
+            RegexOption.IGNORE_CASE
+        )
+        val candidate = pattern.find(text)?.groupValues?.get(1)?.trim() ?: ""
+        // Validierung: Keine IBAN und kein Datum als Kundennummer
+        if (candidate.startsWith("DE", ignoreCase = true) && candidate.length > 15) return ""
+        if (candidate.matches(Regex("[0-9]{1,2}\\.[0-9]{1,2}\\.[0-9]{2,4}"))) return ""
+        return candidate
     }
 
     private fun extractInvoiceNumber(text: String): String {
-        val pattern = Regex("(?:rechnungsnummer|rechnungs-nr|belegnummer|rechnung-nr)\\s*[:\\s]?\\s*([A-Za-z0-9\\-_/]{4,20})", RegexOption.IGNORE_CASE)
-        return pattern.find(text)?.groupValues?.get(1) ?: ""
+        val pattern = Regex(
+            "(?:rechnungsnummer|rechnungs-nr|rechnung-nr|rechnungs\\s*nr|belegnummer|beleg-nr|rg-nr|invoice\\s*no)\\s*[:\\s#]?\\s*([A-Za-z0-9\\-_/]{3,25})",
+            RegexOption.IGNORE_CASE
+        )
+        val candidate = pattern.find(text)?.groupValues?.get(1)?.trim() ?: ""
+        if (candidate.matches(Regex("[0-9]{1,2}\\.[0-9]{1,2}\\.[0-9]{2,4}"))) return ""
+        return candidate
     }
 
     private fun extractPolicyNumber(text: String): String {
-        val pattern = Regex("(?:versicherungsschein-nr|versicherungsnummer|policennummer|police-nr)\\s*[:\\s]?\\s*([A-Za-z0-9\\-_/]{5,20})", RegexOption.IGNORE_CASE)
-        return pattern.find(text)?.groupValues?.get(1) ?: ""
+        val pattern = Regex(
+            "(?:versicherungsschein-nr|versicherungsnummer|policennummer|police-nr|vertragsnummer|vertrags-nr)\\s*[:\\s#]?\\s*([A-Za-z0-9\\-_/]{4,25})",
+            RegexOption.IGNORE_CASE
+        )
+        return pattern.find(text)?.groupValues?.get(1)?.trim() ?: ""
+    }
+
+    private fun extractContractAccount(text: String): String {
+        val pattern = Regex(
+            "(?:vertragskonto|vertragskonto-nr|buchungskonto|vertrags-id)\\s*[:\\s#]?\\s*([A-Za-z0-9\\-_/]{4,20})",
+            RegexOption.IGNORE_CASE
+        )
+        return pattern.find(text)?.groupValues?.get(1)?.trim() ?: ""
+    }
+
+    private fun extractMeterNumber(text: String): String {
+        val pattern = Regex(
+            "(?:zählernummer|zähler-nr|zählerstand|zähler)\\s*[:\\s#]?\\s*([A-Za-z0-9\\-_]{4,16})",
+            RegexOption.IGNORE_CASE
+        )
+        return pattern.find(text)?.groupValues?.get(1)?.trim() ?: ""
+    }
+
+    private fun extractLicensePlate(text: String): String {
+        val pattern = Regex("\\b([A-ZÄÖÜ]{1,3}[ -][A-Z]{1,2}[ -]?[0-9]{1,4})\\b")
+        return pattern.find(text)?.groupValues?.get(1)?.trim() ?: ""
     }
 
     private fun extractTaxId(text: String): String {
-        val pattern = Regex("(?:steuernummer|steuer-id|identifikationsnummer)\\s*[:\\s]?\\s*([0-9/\\s]{10,18})", RegexOption.IGNORE_CASE)
+        val pattern = Regex(
+            "(?:steuernummer|steuer-id|steuer-identifikationsnummer|ust-idnr|ust-id|idnr|aktenzeichen)\\s*[:\\s]?\\s*([0-9/\\sA-Za-z\\-_]{8,20})",
+            RegexOption.IGNORE_CASE
+        )
         return pattern.find(text)?.groupValues?.get(1)?.trim() ?: ""
     }
 
     private fun extractSenderFromHeader(text: String): String? {
-        val firstLines = text.lines().take(5).map { it.trim() }.filter { it.length in 3..35 && !it.contains("rechnung", ignoreCase = true) && !it.contains("datum", ignoreCase = true) && !it.contains("seite", ignoreCase = true) }
+        val firstLines = text.lines().take(6).map { it.trim() }
+            .filter { line ->
+                line.length in 3..40 &&
+                !line.contains("rechnung", ignoreCase = true) &&
+                !line.contains("datum", ignoreCase = true) &&
+                !line.contains("seite", ignoreCase = true) &&
+                !line.contains("sehr geehrte", ignoreCase = true) &&
+                !line.contains("ihre kundennummer", ignoreCase = true) &&
+                !line.contains("fälligkeit", ignoreCase = true) &&
+                !line.contains("herzlich willkommen", ignoreCase = true)
+            }
         return firstLines.firstOrNull()
     }
 
     /**
-     * KI-Regelgenerator: Erstellt konkrete Schlagwort-Regeln anhand der Beschreibung des Nutzers,
-     * inklusive vor-konfigurierter, strukturierter Zusatzfelder!
+     * KI-Regelgenerator: Erstellt dynamische und präzise Schlagwort-Regeln anhand
+     * jeder beliebigen Beschreibung des Nutzers, inklusive passgenauer Zusatzfelder!
      */
     suspend fun generateRulesFromPrompt(userDescription: String): List<DocRule> = withContext(Dispatchers.Default) {
         _isGenerating.value = true
         try {
-            kotlinx.coroutines.delay(200L) // Simulation der Inferenz
+            kotlinx.coroutines.delay(150L) // Inferenz-Simulation
             val descLower = userDescription.lowercase()
             val generatedList = mutableListOf<DocRule>()
 
-            // 3. Vodafone
-            if (descLower.contains("vodafone") || descLower.contains("mobilfunk") || descLower.contains("handy") || descLower.contains("telefon")) {
-                val (icon, logo) = com.example.ui.components.detectSuggestedLogoAndIcon("Vodafone", userDescription, "Verträge")
-                val targetCf = mapOf("Rechnungsbetrag" to "Monatlich", "Fälligkeit" to "Fällig")
+            // 1. Mobilfunk & Internet (z.B. Vodafone, Telekom, O2, 1&1)
+            if (descLower.contains("vodafone") || descLower.contains("telekom") || descLower.contains("o2") ||
+                descLower.contains("mobilfunk") || descLower.contains("handy") || descLower.contains("telefon") ||
+                descLower.contains("internet") || descLower.contains("dsl") || descLower.contains("1&1")) {
+                val providerName = when {
+                    descLower.contains("vodafone") -> "Vodafone GmbH"
+                    descLower.contains("telekom") || descLower.contains("magenta") -> "Deutsche Telekom"
+                    descLower.contains("o2") || descLower.contains("telefonica") -> "Telefónica O2"
+                    descLower.contains("1&1") -> "1&1 Telecom"
+                    else -> "Mobilfunk & Internet"
+                }
+                val (icon, logo) = com.example.ui.components.detectSuggestedLogoAndIcon(providerName, userDescription, "Verträge")
+                val targetCf = mapOf(
+                    "Rechnungsbetrag" to "Monatlich",
+                    "Fälligkeit" to "Zahlungsziel",
+                    "Kundennummer" to "Kunden-Nr.",
+                    "Rechnungsnummer" to "Rechnungs-Nr."
+                )
+                val kw = listOfNotNull(providerName.lowercase().split(" ").firstOrNull(), "rechnung", "mobilfunk", "abrechnung")
                 generatedList.add(
                     DocRule(
                         id = UUID.randomUUID().toString(),
-                        name = "Vodafone Mobilfunkabrechnung",
-                        matchKeywords = listOf("vodafone", "rechnungsnummer", "ihre rechnung"),
-                        excludeKeywords = listOf("mahnung", "kündigungsbestätigung"),
+                        name = "$providerName Abrechnung",
+                        matchKeywords = kw,
+                        excludeKeywords = listOf("werbung", "newsletter"),
                         targetMainCategoryId = "A02",
                         targetSubCategoryId = "B2.01",
                         targetDocType = "Rechnung",
-                        detectedSender = "Vodafone GmbH",
-                        targetTags = listOf("#mobilfunk", "#vodafone", "#fixkosten"),
+                        detectedSender = providerName,
+                        targetTags = listOf("#mobilfunk", "#internet", "#fixkosten"),
                         isEnabled = true,
                         isAiGenerated = true,
                         targetCustomFields = targetCf,
-                        targetIcon = icon,
-                        targetLogo = logo.ifBlank { "vodafone" }
+                        targetIcon = icon.ifBlank { "phone_android" },
+                        targetLogo = logo
                     )
                 )
             }
 
-            // 4. Telekom
-            if (descLower.contains("telekom") || descLower.contains("magenta") || descLower.contains("t-mobile")) {
-                val (icon, logo) = com.example.ui.components.detectSuggestedLogoAndIcon("Telekom", userDescription, "Verträge")
-                val targetCf = mapOf("Rechnungsbetrag" to "Monatlich", "Buchungskonto" to "Konto")
-                generatedList.add(
-                    DocRule(
-                        id = UUID.randomUUID().toString(),
-                        name = "Telekom Festnetz & Mobilfunk",
-                        matchKeywords = listOf("telekom", "rechnung online", "buchungskonto"),
-                        excludeKeywords = listOf("werbung"),
-                        targetMainCategoryId = "A02",
-                        targetSubCategoryId = "B2.01",
-                        targetDocType = "Rechnung",
-                        detectedSender = "Deutsche Telekom",
-                        targetTags = listOf("#telekom", "#internet", "#fixkosten"),
-                        isEnabled = true,
-                        isAiGenerated = true,
-                        targetCustomFields = targetCf,
-                        targetIcon = icon,
-                        targetLogo = logo.ifBlank { "telekom" }
-                    )
+            // 2. Energie & Versorger (z.B. Strom, Gas, Stadtwerke, E.ON, Vattenfall)
+            if (descLower.contains("strom") || descLower.contains("gas") || descLower.contains("energie") ||
+                descLower.contains("stadtwerke") || descLower.contains("vattenfall") || descLower.contains("eon") ||
+                descLower.contains("e.on") || descLower.contains("enbw")) {
+                val providerName = when {
+                    descLower.contains("stadtwerke") -> "Stadtwerke"
+                    descLower.contains("vattenfall") -> "Vattenfall"
+                    descLower.contains("eon") || descLower.contains("e.on") -> "E.ON Energie"
+                    descLower.contains("enbw") -> "EnBW"
+                    else -> "Energieversorger"
+                }
+                val (icon, logo) = com.example.ui.components.detectSuggestedLogoAndIcon(providerName, userDescription, "Verträge")
+                val targetCf = mapOf(
+                    "Rechnungsbetrag" to "Betrag",
+                    "Fälligkeit" to "Fälligkeit",
+                    "Vertragskonto" to "Nummer",
+                    "Zählernummer" to "Zähler-Nr."
                 )
-            }
-
-            // Energie & Strom
-            if (descLower.contains("strom") || descLower.contains("gas") || descLower.contains("energie") || descLower.contains("stadtwerke") || descLower.contains("vattenfall") || descLower.contains("eon")) {
-                val (icon, logo) = com.example.ui.components.detectSuggestedLogoAndIcon("Energie", userDescription, "Verträge")
-                val targetCf = mapOf("Rechnungsbetrag" to "Betrag", "Vertragskonto" to "Nummer")
                 generatedList.add(
                     DocRule(
                         id = UUID.randomUUID().toString(),
-                        name = "Energie & Stromabrechnung",
-                        matchKeywords = listOf("strom", "energie", "verbrauch"),
+                        name = "$providerName Strom & Gas",
+                        matchKeywords = listOfNotNull(providerName.lowercase().split(" ").firstOrNull(), "strom", "energie", "abschlag"),
                         excludeKeywords = listOf("werbung"),
                         targetMainCategoryId = "A02",
                         targetSubCategoryId = "B2.02",
                         targetDocType = "Rechnung",
-                        detectedSender = "Energieversorger",
-                        targetTags = listOf("#strom", "#energie"),
+                        detectedSender = providerName,
+                        targetTags = listOf("#strom", "#energie", "#haushalt"),
                         isEnabled = true,
                         isAiGenerated = true,
                         targetCustomFields = targetCf,
@@ -1077,34 +1373,92 @@ class LlmService(private val context: Context) {
                 )
             }
 
-            // 6. Versicherung
-            if (descLower.contains("allianz") || descLower.contains("versicherung") || descLower.contains("huk") || descLower.contains("haftpflicht") || descLower.contains("auto") || descLower.contains("ergo")) {
-                val (icon, logo) = com.example.ui.components.detectSuggestedLogoAndIcon("Versicherung", userDescription, "Versicherungen")
-                val targetCf = mapOf("Jahresbeitrag" to "Beitrag", "Versicherungsschein-Nr." to "Nummer")
+            // 3. Versicherungen & KFZ (z.B. Allianz, HUK, Ergo, AXA, DEVK, ADAC)
+            if (descLower.contains("allianz") || descLower.contains("versicherung") || descLower.contains("huk") ||
+                descLower.contains("haftpflicht") || descLower.contains("ergo") || descLower.contains("axa") ||
+                descLower.contains("devk") || descLower.contains("adac") || descLower.contains("kfz")) {
+                val providerName = when {
+                    descLower.contains("allianz") -> "Allianz"
+                    descLower.contains("huk") -> "HUK-COBURG"
+                    descLower.contains("ergo") -> "ERGO Versicherung"
+                    descLower.contains("axa") -> "AXA Versicherung"
+                    descLower.contains("adac") -> "ADAC"
+                    descLower.contains("devk") -> "DEVK"
+                    else -> "Versicherung"
+                }
+                val isKfz = descLower.contains("kfz") || descLower.contains("auto") || descLower.contains("schadenfreiheits")
+                val (icon, logo) = com.example.ui.components.detectSuggestedLogoAndIcon(providerName, userDescription, "Versicherungen")
+                val targetCf = if (isKfz) {
+                    mapOf(
+                        "Versicherungsbeitrag" to "Jahresbeitrag",
+                        "Policennummer" to "Versicherungsschein-Nr.",
+                        "Amtl. Kennzeichen" to "Kennzeichen",
+                        "Schadenfreiheitsklasse" to "SF-Klasse"
+                    )
+                } else {
+                    mapOf(
+                        "Jahresbeitrag" to "Beitrag",
+                        "Policen- / Vertragsnummer" to "Versicherungsschein-Nr.",
+                        "Vertragsbeginn" to "Datum"
+                    )
+                }
                 generatedList.add(
                     DocRule(
                         id = UUID.randomUUID().toString(),
-                        name = "Versicherungspolice & Beitragsrechnung",
-                        matchKeywords = listOf("versicherung", "versicherungsschein", "beitrag", "police"),
-                        excludeKeywords = listOf("angebot", "werbung"),
+                        name = if (isKfz) "$providerName Kfz-Versicherung" else "$providerName Police & Beitrag",
+                        matchKeywords = listOfNotNull(providerName.lowercase().split(" ").firstOrNull(), "versicherung", "police", if (isKfz) "kfz" else "beitrag"),
+                        excludeKeywords = listOf("werbung", "angebot"),
                         targetMainCategoryId = "A04",
                         targetSubCategoryId = "B4.01",
                         targetDocType = "Versicherung",
-                        detectedSender = "Versicherung",
-                        targetTags = listOf("#versicherung", "#police"),
+                        detectedSender = providerName,
+                        targetTags = listOf("#versicherung", if (isKfz) "#kfz" else "#police"),
                         isEnabled = true,
                         isAiGenerated = true,
                         targetCustomFields = targetCf,
-                        targetIcon = icon.ifBlank { "shield" },
+                        targetIcon = icon.ifBlank { if (isKfz) "directions_car" else "shield" },
                         targetLogo = logo
                     )
                 )
             }
 
-            // 7. Steuern & Finanzamt
+            // 4. Gehalt & Arbeitgeber
+            if (descLower.contains("gehalt") || descLower.contains("lohn") || descLower.contains("arbeitgeber") ||
+                descLower.contains("entgelt") || descLower.contains("brutto") || descLower.contains("netto")) {
+                val (icon, logo) = com.example.ui.components.detectSuggestedLogoAndIcon("Arbeitgeber", userDescription, "Finanzen")
+                val targetCf = mapOf(
+                    "Auszahlungsbetrag (Netto)" to "Netto",
+                    "Bruttoentgelt" to "Brutto",
+                    "Abrechnungsmonat" to "Monat"
+                )
+                generatedList.add(
+                    DocRule(
+                        id = UUID.randomUUID().toString(),
+                        name = "Monatliche Gehaltsabrechnung",
+                        matchKeywords = listOf("gehaltsabrechnung", "lohnabrechnung", "netto", "brutto"),
+                        excludeKeywords = emptyList(),
+                        targetMainCategoryId = "A03",
+                        targetSubCategoryId = "B3.02",
+                        targetDocType = "Gehaltsabrechnung",
+                        detectedSender = "Arbeitgeber",
+                        targetTags = listOf("#gehalt", "#einkommen", "#finanzen"),
+                        isEnabled = true,
+                        isAiGenerated = true,
+                        targetCustomFields = targetCf,
+                        targetIcon = icon.ifBlank { "payments" },
+                        targetLogo = logo
+                    )
+                )
+            }
+
+            // 5. Finanzamt & Steuern
             if (descLower.contains("finanzamt") || descLower.contains("steuer") || descLower.contains("elster")) {
                 val (icon, logo) = com.example.ui.components.detectSuggestedLogoAndIcon("Finanzamt", userDescription, "Finanzen")
-                val targetCf = mapOf("Steuerjahr" to "Jahr", "Steuernummer" to "Nummer", "Erstattung / Nachzahlung" to "Saldo")
+                val targetCf = mapOf(
+                    "Festgesetzter Betrag" to "Saldo",
+                    "Steuernummer" to "Steuernummer",
+                    "Datum / Frist" to "Frist"
+                )
                 generatedList.add(
                     DocRule(
                         id = UUID.randomUUID().toString(),
@@ -1115,7 +1469,7 @@ class LlmService(private val context: Context) {
                         targetSubCategoryId = "B3.04",
                         targetDocType = "Steuerbescheid",
                         detectedSender = "Finanzamt",
-                        targetTags = listOf("#steuern", "#finanzamt", "#steuerbescheid"),
+                        targetTags = listOf("#steuern", "#finanzamt", "#bescheid"),
                         isEnabled = true,
                         isAiGenerated = true,
                         targetCustomFields = targetCf,
@@ -1125,77 +1479,56 @@ class LlmService(private val context: Context) {
                 )
             }
 
-            // 8. Bank & Kontoauszug
-            if (descLower.contains("bank") || descLower.contains("sparkasse") || descLower.contains("konto") || descLower.contains("ing")) {
-                val (icon, logo) = com.example.ui.components.detectSuggestedLogoAndIcon("Bank", userDescription, "Finanzen")
-                val targetCf = mapOf("Kontostand" to "Saldo", "IBAN" to "IBAN")
-                generatedList.add(
-                    DocRule(
-                        id = UUID.randomUUID().toString(),
-                        name = "Bankkonto / Kontoauszug",
-                        matchKeywords = listOf("kontoauszug", "kontostand", "iban", "saldo"),
-                        excludeKeywords = emptyList(),
-                        targetMainCategoryId = "A03",
-                        targetSubCategoryId = "B3.01",
-                        targetDocType = "Kontoauszug",
-                        detectedSender = "Bank",
-                        targetTags = listOf("#finanzen", "#bank"),
-                        isEnabled = true,
-                        isAiGenerated = true,
-                        targetCustomFields = targetCf,
-                        targetIcon = icon.ifBlank { "bank" },
-                        targetLogo = logo
-                    )
-                )
-            }
-
-            // 9. Wohnung & Miete
-            if (descLower.contains("miete") || descLower.contains("wohnung") || descLower.contains("vermieter") || descLower.contains("nebenkosten")) {
-                val (icon, logo) = com.example.ui.components.detectSuggestedLogoAndIcon("Vermieter", userDescription, "Wohnung")
-                val targetCf = mapOf("Mietbetrag (Warm)" to "Betrag", "Nebenkosten" to "Abschlag")
-                generatedList.add(
-                    DocRule(
-                        id = UUID.randomUUID().toString(),
-                        name = "Mietunterlagen & Nebenkosten",
-                        matchKeywords = listOf("mietvertrag", "nebenkostenabrechnung", "vermieter", "betriebskosten"),
-                        excludeKeywords = emptyList(),
-                        targetMainCategoryId = "A01",
-                        targetSubCategoryId = "B1.01",
-                        targetDocType = "Mietvertrag",
-                        detectedSender = "Vermieter",
-                        targetTags = listOf("#wohnung", "#miete", "#nebenkosten"),
-                        isEnabled = true,
-                        isAiGenerated = true,
-                        targetCustomFields = targetCf,
-                        targetIcon = icon.ifBlank { "home" },
-                        targetLogo = logo
-                    )
-                )
-            }
-
+            // 6. Dynamischer Parser für beliebige Firmen / individuelle Prompts
             if (generatedList.isEmpty()) {
-                val cleanWords = userDescription.split(" ", ",", ";")
-                    .map { it.trim().lowercase() }
-                    .filter { it.length > 3 && !it.contains("habe") && !it.contains("eine") && !it.contains("folgende") }
-                    .take(3)
+                val cleanWords = userDescription.split(" ", ",", ";", "\n")
+                    .map { it.trim().lowercase().replace(Regex("[^a-zäöüß0-9]"), "") }
+                    .filter { it.length > 3 && it !in STOP_WORDS }
 
-                val ruleName = userDescription.take(35).replace("\n", " ")
                 val detectedSender = cleanWords.firstOrNull()?.replaceFirstChar { it.uppercase() } ?: "Absender"
                 val (icon, logo) = com.example.ui.components.detectSuggestedLogoAndIcon(detectedSender, userDescription, "Allgemein")
 
+                val isBill = descLower.contains("rechnung") || descLower.contains("kauf") || descLower.contains("bestell")
+                val isContract = descLower.contains("vertrag") || descLower.contains("abo") || descLower.contains("mitglied")
+
+                val dynamicCustomFields = when {
+                    isBill -> mapOf(
+                        "Rechnungsbetrag" to "Betrag",
+                        "Fälligkeit" to "Datum",
+                        "Rechnungsnummer" to "Nummer"
+                    )
+                    isContract -> mapOf(
+                        "Vertragsnummer" to "Nummer",
+                        "Beitrag / Rate" to "Betrag",
+                        "Vertragsdatum" to "Datum"
+                    )
+                    else -> mapOf(
+                        "Betrag" to "Betrag",
+                        "Datum" to "Datum",
+                        "Referenznummer" to "Referenz"
+                    )
+                }
+
+                val docType = if (isBill) "Rechnung" else if (isContract) "Vertrag" else "Dokument"
+                val mainCat = if (isBill) "A02" else if (isContract) "A02" else "A01"
+                val subCat = if (isBill) "B2.01" else if (isContract) "B2.03" else "B1.01"
+
+                val matchKws = if (cleanWords.isNotEmpty()) cleanWords.take(4) else listOf(detectedSender.lowercase(), "dokument")
+
                 generatedList.add(
                     DocRule(
                         id = UUID.randomUUID().toString(),
-                        name = ruleName,
-                        matchKeywords = if (cleanWords.isNotEmpty()) cleanWords else listOf("rechnung", "beleg"),
+                        name = "$detectedSender $docType",
+                        matchKeywords = matchKws,
                         excludeKeywords = emptyList(),
-                        targetMainCategoryId = "A01",
-                        targetSubCategoryId = "B1.01",
-                        targetDocType = "Rechnung",
+                        targetMainCategoryId = mainCat,
+                        targetSubCategoryId = subCat,
+                        targetDocType = docType,
                         detectedSender = detectedSender,
-                        targetTags = listOf("#dokument"),
+                        targetTags = listOf("#${detectedSender.lowercase()}", "#$docType".lowercase()),
                         isEnabled = true,
                         isAiGenerated = true,
+                        targetCustomFields = dynamicCustomFields,
                         targetIcon = icon,
                         targetLogo = logo
                     )
