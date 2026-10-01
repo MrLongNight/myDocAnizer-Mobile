@@ -34,6 +34,7 @@ class DocAnizerViewModel(application: Application) : AndroidViewModel(applicatio
     val ruleRepo = DocRuleRepository(application)
     val llmService = LlmService(application)
     val biometricAuthManager = BiometricAuthManager(application)
+    val passkeyAuthManager = PasskeyAuthManager(application)
     val p2pSyncManager = P2pSyncManager(application, db)
 
     init {
@@ -562,12 +563,31 @@ class DocAnizerViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     suspend fun testCloudSync(target: String, onComplete: (Boolean, String) -> Unit) {
-        kotlinx.coroutines.delay(500)
-        if (target == "GOOGLE_DRIVE") {
-            connectGoogleDrive(cloudSyncConfig.value.googleDriveAccount)
-            onComplete(true, "Verbindung zu Google Drive erfolgreich hergestellt!")
+        val config = cloudSyncConfig.value
+        if (target == "WEBDAV" || target == "NAS" || config.enableWebDavNas) {
+            if (config.webDavUrl.isBlank()) {
+                onComplete(false, "WebDAV/NAS-URL darf nicht leer sein.")
+                return
+            }
+            val res = WebDavClient.testConnection(config.webDavUrl, config.webDavUsername, config.webDavPassword)
+            res.fold(
+                onSuccess = { msg ->
+                    connectNas(config.nasProtocol, config.nasShareName)
+                    onComplete(true, msg)
+                },
+                onFailure = { err ->
+                    onComplete(false, err.localizedMessage ?: "Verbindung zum WebDAV/NAS fehlgeschlagen.")
+                }
+            )
+        } else if (target == "GOOGLE_DRIVE") {
+            if (config.googleDriveAccount.isBlank()) {
+                onComplete(false, "Google-Konto-E-Mail darf nicht leer sein.")
+            } else {
+                connectGoogleDrive(config.googleDriveAccount)
+                onComplete(true, "Google Drive Ziel-Konto '${config.googleDriveAccount}' konfiguriert. Vor Upload wird Zero-Knowledge AES-256-GCM Verschlüsselung angewendet.")
+            }
         } else {
-            onComplete(true, "Verbindung erfolgreich hergestellt!")
+            onComplete(true, "Lokaler Speicher bereit.")
         }
     }
 

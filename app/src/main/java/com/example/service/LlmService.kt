@@ -447,11 +447,10 @@ class LlmService(private val context: Context) {
     suspend fun syncModelCatalogFromRemote(forceCheck: Boolean = false) = withContext(Dispatchers.IO) {
         _isCheckingNewModels.value = true
         try {
-            kotlinx.coroutines.delay(650L)
             _lastCatalogSync.value = System.currentTimeMillis()
             val newCount = _availableModels.value.count { it.isNewRelease }
             if (newCount > 0 && forceCheck) {
-                _newModelsNotification.value = "🚀 $newCount neue verifizierte HuggingFace Modelle freigegeben!"
+                _newModelsNotification.value = "🚀 $newCount verifizierte HuggingFace Modelle verfügbar!"
             }
         } finally {
             _isCheckingNewModels.value = false
@@ -1002,7 +1001,6 @@ class LlmService(private val context: Context) {
         val startTime = System.currentTimeMillis()
         val activeModel = getSelectedModel()
         try {
-            kotlinx.coroutines.delay(120L)
             val feedbackLower = userFeedbackPrompt.lowercase().trim()
             val newCustomFields = currentRule.targetCustomFields.toMutableMap()
             var newName = currentRule.name
@@ -1292,7 +1290,6 @@ class LlmService(private val context: Context) {
     suspend fun generateRulesFromPrompt(userDescription: String): List<DocRule> = withContext(Dispatchers.Default) {
         _isGenerating.value = true
         try {
-            kotlinx.coroutines.delay(150L) // Inferenz-Simulation
             val descLower = userDescription.lowercase()
             val generatedList = mutableListOf<DocRule>()
 
@@ -1553,7 +1550,6 @@ class LlmService(private val context: Context) {
     ): String = withContext(Dispatchers.Default) {
         _isGenerating.value = true
         try {
-            kotlinx.coroutines.delay(650) // Simulation der lokalen NPU/CPU-Inferenzzeit
             val qLower = question.lowercase().trim()
             val now = System.currentTimeMillis()
 
