@@ -537,6 +537,69 @@ fun HuggingFaceModelsContent(
             }
         }
 
+        // PERSISTENTER MODELL-SPEICHER CARD (Überlebt App-Updates & Deinstallationen)
+        item {
+            var scanFeedbackMessage by remember { mutableStateOf<String?>(null) }
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.weight(1f)) {
+                            Icon(Icons.Default.FolderSpecial, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            Column {
+                                Text("Persistenter Modellspeicher", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                                Text(
+                                    text = "Download/myDocAnizer_Models/ (bleibt bei APK-Updates & Neuinstallationen erhalten)",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Vorhandene .gguf-Dateien scannen:",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        OutlinedButton(
+                            onClick = {
+                                val found = viewModel.rescanPersistedModels()
+                                scanFeedbackMessage = if (found > 0) "$found Modell(e) erfolgreich erkannt & verknüpft!" else "Keine neuen .gguf-Dateien im Download-Ordner gefunden."
+                            },
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Icon(Icons.Default.FindInPage, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Speicher scannen", style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+
+                    scanFeedbackMessage?.let { msg ->
+                        Text(
+                            text = msg,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Bold,
+                            color = if (msg.contains("erfolgreich")) Color(0xFF16A34A) else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+
         // INFERENZ-PARAMETER CARD (Im Standard-Modus kompakt/eingeklappt, im Experten-Modus voll geöffnet)
         item {
             Surface(

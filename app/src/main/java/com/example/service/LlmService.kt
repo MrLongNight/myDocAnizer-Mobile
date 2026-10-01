@@ -2,6 +2,7 @@ package com.example.service
 
 import android.app.ActivityManager
 import android.content.Context
+import android.util.Log
 import com.example.model.DeviceHardwareInfo
 import com.example.model.DocRule
 import com.example.model.DocumentEntity
@@ -131,14 +132,62 @@ class LlmService(private val context: Context) {
         }
     }
 
+    fun getCandidateModelDirs(): List<File> {
+        val dirs = mutableListOf<File>()
+        try {
+            // 1. Öffentlicher Downloads Ordner (überlebt App-Deinstallationen!)
+            val publicDownloads = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
+            if (publicDownloads != null) {
+                val myModelsDownload = File(publicDownloads, "myDocAnizer_Models")
+                if (!myModelsDownload.exists()) myModelsDownload.mkdirs()
+                dirs.add(myModelsDownload)
+                dirs.add(publicDownloads)
+            }
+        } catch (_: Throwable) {}
+
+        try {
+            // 2. Öffentlicher Documents Ordner
+            val publicDocs = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOCUMENTS)
+            if (publicDocs != null) {
+                val myModelsDocs = File(publicDocs, "myDocAnizer_Models")
+                if (!myModelsDocs.exists()) myModelsDocs.mkdirs()
+                dirs.add(myModelsDocs)
+            }
+        } catch (_: Throwable) {}
+
+        try {
+            // 3. App External Storage
+            val extDir = context.getExternalFilesDir("models")
+            if (extDir != null) {
+                if (!extDir.exists()) extDir.mkdirs()
+                dirs.add(extDir)
+            }
+        } catch (_: Throwable) {}
+
+        try {
+            // 4. App Internal Storage
+            val internal = File(context.filesDir ?: context.cacheDir, "models")
+            if (!internal.exists()) internal.mkdirs()
+            dirs.add(internal)
+        } catch (_: Throwable) {}
+
+        return dirs.distinctBy { it.absolutePath }
+    }
+
     val modelsDir: File
         get() = try {
-            val base = context.filesDir ?: context.cacheDir
-            File(base, "models").apply {
-                if (!exists()) mkdirs()
+            // Bevorzuge persistenten öffentlichen Speicher (überlebt APK-Deinstallation)
+            val publicDownloads = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
+            val persistentDir = File(publicDownloads, "myDocAnizer_Models")
+            if (persistentDir.exists() || persistentDir.mkdirs()) {
+                persistentDir
+            } else {
+                val base = context.filesDir ?: context.cacheDir
+                File(base, "models").apply { if (!exists()) mkdirs() }
             }
         } catch (_: Throwable) {
-            context.cacheDir
+            val base = context.filesDir ?: context.cacheDir
+            File(base, "models").apply { if (!exists()) mkdirs() }
         }
 
     val llamaCppEngine = LlamaCppInferenceEngine(context)
@@ -152,9 +201,21 @@ class LlmService(private val context: Context) {
             .build()
     }
 
+    /**
+     * Sucht die Modelldatei über alle persistenten Ordner (Downloads, Documents, App-Speicher).
+     */
     fun getModelFile(modelId: String): File {
         val model = _availableModels.value.find { it.id == modelId }
         val fileName = model?.fileName?.ifBlank { "${modelId}.gguf" } ?: "${modelId}.gguf"
+
+        // Suche zuerst in allen bestehenden Kandidaten-Verzeichnissen
+        for (dir in getCandidateModelDirs()) {
+            val candidate = File(dir, fileName)
+            if (candidate.exists() && candidate.length() > 1024 * 1024) {
+                return candidate
+            }
+        }
+        // Fallback auf Standard-Verzeichnis
         return File(modelsDir, fileName)
     }
 
@@ -162,8 +223,13 @@ class LlmService(private val context: Context) {
         return try {
             if (fileName.isBlank()) false
             else {
-                val file = File(modelsDir, fileName)
-                file.exists() && file.length() > 1024 * 1024 // min. 1 MB
+                for (dir in getCandidateModelDirs()) {
+                    val file = File(dir, fileName)
+                    if (file.exists() && file.length() > 1024 * 1024) {
+                        return true
+                    }
+                }
+                false
             }
         } catch (_: Throwable) {
             false
@@ -174,12 +240,72 @@ class LlmService(private val context: Context) {
         return try {
             if (fileName.isBlank()) 0L
             else {
-                val file = File(modelsDir, fileName)
-                if (file.exists()) file.length() else 0L
+                for (dir in getCandidateModelDirs()) {
+                    val file = File(dir, fileName)
+                    if (file.exists() && file.length() > 1024 * 1024) {
+                        return file.length()
+                    }
+                }
+                0L
             }
         } catch (_: Throwable) {
             0L
         }
+    }
+
+    /**
+     * Durchsucht alle Gerätespeicher nach bereits heruntergeladenen .gguf-Modellen
+     * und reaktiviert diese sofort (z. B. nach App-Neuinstallation/Update).
+     */
+    fun scanAndLinkExistingModels(): Int {
+        var linkedCount = 0
+        try {
+            val candidateDirs = getCandidateModelDirs()
+            val existingFiles = mutableMapOf<String, File>()
+
+            for (dir in candidateDirs) {
+                if (dir.exists() && dir.isDirectory) {
+                    dir.listFiles()?.forEach { f ->
+                        if (f.isFile && f.name.endsWith(".gguf", ignoreCase = true) && f.length() > 1024 * 1024) {
+                            existingFiles[f.name.lowercase()] = f
+                        }
+                    }
+                }
+            }
+
+            _availableModels.value = _availableModels.value.map { model ->
+                val targetName = model.fileName.ifBlank { "${model.id}.gguf" }.lowercase()
+                val foundFile = existingFiles[targetName] ?: existingFiles.values.firstOrNull { 
+                    it.name.contains(model.id, ignoreCase = true) 
+                }
+
+                if (foundFile != null && foundFile.exists()) {
+                    linkedCount++
+                    model.copy(
+                        isDownloaded = true,
+                        localFileSizeBytes = foundFile.length(),
+                        downloadProgress = 1.0f
+                    )
+                } else {
+                    model.copy(
+                        isDownloaded = isModelPhysicallyOnDisk(model.fileName),
+                        localFileSizeBytes = getModelDiskSize(model.fileName)
+                    )
+                }
+            }
+
+            if (linkedCount > 0) {
+                AppAuditLogger.log(
+                    category = LogCategory.AI_INFERENCE,
+                    tag = "ModelPersistence",
+                    message = "$linkedCount bestehende GGUF-Modelle im persistenten Gerätespeicher gefunden und verknüpft.",
+                    details = "Geprüfte Pfade: ${candidateDirs.joinToString { it.name }}"
+                )
+            }
+        } catch (e: Exception) {
+            Log.e("LlmService", "Fehler beim Durchsuchen nach Modellen: ${e.message}")
+        }
+        return linkedCount
     }
 
     private fun createInitialModels(hw: DeviceHardwareInfo): List<HuggingFaceModelInfo> {

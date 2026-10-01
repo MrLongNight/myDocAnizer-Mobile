@@ -496,6 +496,7 @@ class DocAnizerViewModel(application: Application) : AndroidViewModel(applicatio
     fun setSystemPromptPreset(preset: String) = updateLlmInferenceConfig(llmInferenceConfig.value.copy(systemPromptFocus = preset))
     fun setLlmCpuThreads(threads: Int) = updateLlmInferenceConfig(llmInferenceConfig.value.copy(threadCount = threads))
     fun dismissNewModelsNotification() = llmService.dismissNewModelsNotification()
+    fun rescanPersistedModels(): Int = llmService.scanAndLinkExistingModels()
     fun syncModelCatalogFromRemote(forceCheck: Boolean = true) {
         viewModelScope.launch {
             llmService.syncModelCatalogFromRemote(forceCheck)
